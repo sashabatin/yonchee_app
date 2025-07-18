@@ -1,85 +1,89 @@
 import os
 import tempfile
+import logging
+import traceback
 from dotenv import load_dotenv
 from telegram import Update
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
-from azure.ai.formrecognizer import DocumentAnalysisClient
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.core.credentials import AzureKeyCredential
-from azure.cognitiveservices.speech import SpeechConfig, SpeechSynthesizer
+from azure.cognitiveservices.speech import SpeechConfig, SpeechSynthesizer, AudioConfig  # <-- Add AudioConfig
+
+# Enable Azure SDK HTTP logging
+logging.basicConfig(level=logging.DEBUG)
+logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(logging.DEBUG)
 
 # Load environment variables from .env file
 load_dotenv()
 
-# Azure credentials
-FORM_RECOGNIZER_ENDPOINT = os.getenv("AZURE_FORM_RECOGNIZER_ENDPOINT")
-FORM_RECOGNIZER_KEY = os.getenv("AZURE_FORM_RECOGNIZER_KEY")
+# Azure and Telegram credentials
+DOCUMENT_INTELLIGENCE_ENDPOINT = os.getenv("AZURE_FORM_RECOGNIZER_ENDPOINT")
+DOCUMENT_INTELLIGENCE_KEY = os.getenv("AZURE_FORM_RECOGNIZER_KEY")
 SPEECH_API_KEY = os.getenv("AZURE_SPEECH_API_KEY")
-SPEECH_REGION = os.getenv("AZURE_REGION")  # Use the region directly
+SPEECH_REGION = os.getenv("AZURE_REGION")
 TELEGRAM_API_TOKEN = os.getenv("TELEGRAM_API_TOKEN")
 
-# Initialize clients
-form_recognizer_client = DocumentAnalysisClient(
-    endpoint=FORM_RECOGNIZER_ENDPOINT,
-    credential=AzureKeyCredential(FORM_RECOGNIZER_KEY)
+# Print endpoint and partial key for debugging
+print("Document Intelligence Endpoint:", DOCUMENT_INTELLIGENCE_ENDPOINT)
+print("Document Intelligence Key (first 6, last 4):", DOCUMENT_INTELLIGENCE_KEY[:6] + "..." + DOCUMENT_INTELLIGENCE_KEY[-4:])
+
+# Initialize Azure clients
+doc_client = DocumentIntelligenceClient(
+    endpoint=DOCUMENT_INTELLIGENCE_ENDPOINT,
+    credential=AzureKeyCredential(DOCUMENT_INTELLIGENCE_KEY)
 )
-
 speech_config = SpeechConfig(subscription=SPEECH_API_KEY, region=SPEECH_REGION)
-synthesizer = SpeechSynthesizer(speech_config=speech_config)
 
-def start(update: Update, context: CallbackContext):
-    update.message.reply_text("📸 Send me a photo or PDF, and I'll convert the text to speech!")
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "📸 Send me a photo or PDF, and I'll convert the text to speech!"
+    )
 
-def handle_file(update: Update, context: CallbackContext):
-    # Step 1: Download user file
+async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     file = update.message.document or update.message.photo[-1]
-    file_path = file.get_file().download(custom_path=tempfile.mktemp())
-    
-    # Initialize audio_path to None
+    tg_file = await file.get_file()
+    file_path = tempfile.mktemp()
     audio_path = None
-    
-    try:
-        # Step 2: Perform OCR using Document Intelligence
-        with open(file_path, "rb") as document:
-            poller = form_recognizer_client.begin_read(document, 0, language="en")
-            result = poller.result()
 
+    try:
+        await tg_file.download_to_drive(file_path)
+        # OCR with Azure Document Intelligence
+        with open(file_path, "rb") as f:
+            poller = doc_client.begin_analyze_document("prebuilt-read", f)
+            result = poller.result()
             extracted_text = ""
-            for page_result in result.analyze_result.read_results:
-                for line in page_result.lines:
-                    extracted_text += line.text + "\n"
+            for page in result.pages:
+                for line in page.lines:
+                    extracted_text += line.content + "\n"
 
         if not extracted_text.strip():
-            update.message.reply_text("No text found in the document.")
+            await update.message.reply_text("No text found in the document.")
             return
 
-        # Step 3: Convert text to speech
+        # Text-to-speech (CORRECTED)
         audio_path = f"{tempfile.mktemp()}.mp3"
-        synthesizer.speak_text_to_file(extracted_text, audio_path)
+        audio_config = AudioConfig(filename=audio_path)
+        synthesizer_with_file = SpeechSynthesizer(speech_config=speech_config, audio_config=audio_config)
+        result = synthesizer_with_file.speak_text_async(extracted_text).get()
 
-        # Step 4: Send audio file back to user
         with open(audio_path, "rb") as audio_file:
-            update.message.reply_audio(audio_file)
+            await update.message.reply_audio(audio_file)
 
     except Exception as e:
-        update.message.reply_text(f"Error: {str(e)}")
-    
+        await update.message.reply_text(f"Error: {str(e)}")
+        print("Exception details:")
+        traceback.print_exc()
     finally:
-        # Cleanup
-        os.remove(file_path)
+        if os.path.exists(file_path):
+            os.remove(file_path)
         if audio_path and os.path.exists(audio_path):
             os.remove(audio_path)
 
 def main():
-    # Bot setup
-    updater = Updater(TELEGRAM_API_TOKEN)
-    dp = updater.dispatcher
-    
-    # Handlers
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(MessageHandler(Filters.document | Filters.photo, handle_file))
-    
-    updater.start_polling()
-    updater.idle()
+    app = ApplicationBuilder().token(TELEGRAM_API_TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO, handle_file))
+    app.run_polling()
 
 if __name__ == "__main__":
     main()
