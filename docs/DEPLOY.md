@@ -1,6 +1,6 @@
 # Deploying Yonchee Bot to Azure Container Apps
 
-This guide describes how to deploy Yonchee Bot as an Azure Container App using a private Azure Container Registry (ACR), securely managing secrets, and mapping environment variables.
+This guide describes how to deploy Yonchee Bot as an Azure Container App using a private Azure Container Registry (ACR), securely managing secrets, mapping environment variables, and automating deployment with GitHub Actions.
 
 ---
 
@@ -132,11 +132,92 @@ az containerapp update \
 
 ---
 
+## 8. CI/CD Automation with GitHub Actions (Recommended)
+
+You can automate building, pushing, and deploying your app using GitHub Actions.
+
+### **Required GitHub Secrets:**
+- `ACR_LOGIN_SERVER`
+- `ACR_USERNAME`
+- `ACR_PASSWORD`
+- `AZURE_CREDENTIALS` (Service Principal JSON)
+- `AZURE_RESOURCE_GROUP` (your resource group name)
+
+### **Sample Workflow:**
+
+```yaml
+name: Build, Push, and Deploy Docker image to ACR
+
+on:
+  push:
+    branches: [ main, dev ]
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.vars.outputs.TAG }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set image tag
+        id: vars
+        run: |
+          if [[ "${GITHUB_REF##*/}" == "main" ]]; then
+            echo "TAG=latest" >> $GITHUB_OUTPUT
+          else
+            echo "TAG=${GITHUB_REF##*/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Log in to Azure Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ secrets.ACR_LOGIN_SERVER }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.ACR_LOGIN_SERVER }}/yonchee-bot:${{ steps.vars.outputs.TAG }}
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment:
+      name: dev  # or "production" for main branch
+    steps:
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Debug - List container apps in resource group
+        run: |
+          echo "Listing container apps in resource group: ${{ secrets.AZURE_RESOURCE_GROUP }}"
+          az containerapp list --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} --output table
+
+      - name: Deploy to Azure Container App
+        run: |
+          az containerapp update \
+            --name yonchee-bot-dev \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --image ${{ secrets.ACR_LOGIN_SERVER }}/yonchee-bot:${{ needs.build-and-push.outputs.tag }}
+```
+
+- Adjust `--name yonchee-bot-dev` for your dev or main app as needed.
+- For production, use a different environment and app name.
+
+---
+
 ## Best Practices
 
 - Use [Azure Key Vault](https://learn.microsoft.com/en-us/azure/key-vault/general/basic-concepts) for advanced secret management.
 - For production, consider using [Managed Identity](https://learn.microsoft.com/en-us/azure/container-apps/managed-identity-authentication?tabs=azure-cli%2Cazure-cli-2) for ACR access.
 - Automate deployment with [GitHub Actions](https://docs.github.com/en/actions) or [Terraform](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/container_app) as you grow.
+- Use separate Container Apps and secrets for dev and main/production environments.
 
 ---
 
@@ -146,6 +227,7 @@ az containerapp update \
 - [Azure CLI Reference](https://learn.microsoft.com/en-us/cli/azure/containerapp)
 - [Azure Container Registry Documentation](https://learn.microsoft.com/en-us/azure/container-registry/)
 - [GitHub Actions for Azure](https://github.com/Azure/actions)
+- [Deploy to Azure Container Apps with GitHub Actions](https://learn.microsoft.com/en-us/azure/container-apps/github-actions)
 
 ---
 
@@ -161,3 +243,17 @@ Repeat the above steps for each version, using different names/tags:
   - `<tag>`: `latest` or `main`
 
 This allows you to run and test both environments independently.
+
+---
+
+## Troubleshooting
+
+- If your GitHub Actions workflow cannot update the app, check:
+  - The resource group and app name in your secrets and workflow.
+  - The service principal permissions (Contributor on the resource group).
+  - That your Docker image is pushed to ACR with the correct tag.
+- Use the debug step in the workflow to list container apps in your resource group.
+
+---
+
+*For any issues, consult the official Azure and GitHub Actions documentation linked above.*
