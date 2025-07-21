@@ -40,6 +40,8 @@ LANG_OPTIONS = {
 LANG_CHOICE = 0
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    logger.info(f"User {user_id} requested help")
     await update.message.reply_text(
         "Send a photo or PDF to convert its text to speech. "
         "After uploading, choose the language of the text. "
@@ -52,6 +54,8 @@ async def prompt_for_file(update: Update):
     )
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    logger.info(f"User {user_id} started the bot")
     await update.message.reply_text(
         "Welcome to Yonchee T-t-S bot!\n"
         "Send me a photo or PDF, and I'll convert the text to speech.\n"
@@ -61,6 +65,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await prompt_for_file(update)
 
 async def ask_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    logger.info(f"User {user_id} sent a file or photo")
     file = update.message.document or update.message.photo[-1]
     tg_file = await file.get_file()
     file_path = tempfile.mktemp()
@@ -94,14 +100,21 @@ def convert_mp3_to_ogg(mp3_path, ogg_path):
         raise RuntimeError("Audio conversion failed.")
 
 async def process_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
     lang_choice = update.message.text.strip()
     file_path = context.user_data.get('file_path')
     audio_path = None
     ogg_path = None
 
     if lang_choice not in LANG_OPTIONS:
+        logger.info(f"User {user_id} made invalid language choice: {lang_choice}")
         await update.message.reply_text("Invalid choice. Please reply with 1, 2, or 3.")
         return LANG_CHOICE
+
+    # Notify user that processing has started
+    processing_message = await update.message.reply_text(
+        "⏳ Processing your file and generating audio, please wait..."
+    )
 
     lang_info = LANG_OPTIONS[lang_choice]
     lang_code = lang_info["lang_code"]
@@ -118,8 +131,10 @@ async def process_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     extracted_text += line.content + "\n"
 
         if not extracted_text.strip():
+            logger.info(f"User {user_id} uploaded a file with no detectable text")
             await update.message.reply_text("No text found in the document.")
             await prompt_for_file(update)
+            await processing_message.delete()
             return ConversationHandler.END
 
         # TTS (MP3)
@@ -136,9 +151,10 @@ async def process_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
         result = synthesizer_with_file.speak_ssml_async(ssml).get()
 
         if result.reason != ResultReason.SynthesizingAudioCompleted:
-            logger.error(f"Speech synthesis error: {result.error_details}")
+            logger.error(f"Speech synthesis error for user {user_id}: {result.error_details}")
             await update.message.reply_text(f"Speech synthesis failed: {result.error_details}")
             await prompt_for_file(update)
+            await processing_message.delete()
             return ConversationHandler.END
 
         # Convert to OGG/Opus for voice message
@@ -150,13 +166,21 @@ async def process_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_voice(voice_file)
         await update.message.reply_text("Tip: Tap the 1x badge on the audio to change playback speed.")
 
+        logger.info(f"User {user_id} processed a file with language choice {lang_choice}")
+
         await prompt_for_file(update)
 
     except Exception as e:
-        await update.message.reply_text(f"Error: {str(e)}")
+        logger.error(f"Exception for user {user_id}: {str(e)}")
         logger.error(traceback.format_exc())
+        await update.message.reply_text(f"Error: {str(e)}")
         await prompt_for_file(update)
     finally:
+        # Remove the "processing" message
+        try:
+            await processing_message.delete()
+        except Exception:
+            pass
         for path in [file_path, audio_path, ogg_path]:
             if path and os.path.exists(path):
                 try:
