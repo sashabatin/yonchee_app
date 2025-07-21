@@ -46,6 +46,11 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      - name: Debug - List container apps in resource group
+        run: |
+          echo "Listing container apps in resource group: ${{ secrets.AZURE_RESOURCE_GROUP }}"
+          az containerapp list --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} --output table
+
       - name: Deploy to Azure Container App
         run: |
           az containerapp update \
