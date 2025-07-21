@@ -48,3 +48,15 @@ Yonchee Bot is a Telegram bot designed to assist vision-impaired individuals by 
 
 **Note:**  
 Adding ffmpeg to your PATH allows your bot to use ffmpeg from anywhere on your system.
+
+## Deploying Yonchee Bot to Azure Container Apps
+
+1. **Build and push Docker image to ACR**
+2. **Create Container Apps environment**
+3. **Create Container App with registry credentials**
+4. **Set secrets for API keys and tokens**
+5. **Map secrets to environment variables**
+6. **Update image on new deployments**
+7. **Check logs and verify the app is running**
+
+See [docs/DEPLOY.md](docs/DEPLOY.md) for full details and example resource names.
