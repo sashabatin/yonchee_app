@@ -8,17 +8,23 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     outputs:
-      tag: ${{ steps.vars.outputs.TAG }}
+      tag: ${{ env.TAG }}
     steps:
       - uses: actions/checkout@v3
 
-      - name: Set image tag
-        id: vars
+      # Set variables for tag, env file, container app, and env name
+      - name: Set Deployment Variables
         run: |
           if [[ "${GITHUB_REF##*/}" == "main" ]]; then
-            echo "TAG=latest" >> $GITHUB_OUTPUT
+            echo "TAG=latest" >> $GITHUB_ENV
+            echo "ENV_FILE=.env" >> $GITHUB_ENV
+            echo "CONTAINER_APP_NAME=yonchee-bot-prod" >> $GITHUB_ENV
+            echo "ENVIRONMENT_NAME=production" >> $GITHUB_ENV
           else
-            echo "TAG=${GITHUB_REF##*/}" >> $GITHUB_OUTPUT
+            echo "TAG=dev" >> $GITHUB_ENV
+            echo "ENV_FILE=.env.dev" >> $GITHUB_ENV
+            echo "CONTAINER_APP_NAME=yonchee-bot-dev" >> $GITHUB_ENV
+            echo "ENVIRONMENT_NAME=dev" >> $GITHUB_ENV
           fi
 
       - name: Log in to Azure Container Registry
@@ -28,18 +34,21 @@ jobs:
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
+      # Use tag/env file variable set above
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
           context: .
           push: true
-          tags: ${{ secrets.ACR_LOGIN_SERVER }}/yonchee-bot:${{ steps.vars.outputs.TAG }}
+          tags: ${{ secrets.ACR_LOGIN_SERVER }}/yonchee-bot:${{ env.TAG }}
+          build-args: |
+            ENV_FILE=${{ env.ENV_FILE }}
 
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
     environment:
-      name: dev  # or "production" for main branch, set up in repo Settings > Environments
+      name: ${{ env.ENVIRONMENT_NAME }}
     steps:
       - name: Azure Login
         uses: azure/login@v1
@@ -54,6 +63,6 @@ jobs:
       - name: Deploy to Azure Container App
         run: |
           az containerapp update \
-            --name yonchee-bot-dev \
+            --name ${{ env.CONTAINER_APP_NAME }} \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --image ${{ secrets.ACR_LOGIN_SERVER }}/yonchee-bot:${{ needs.build-and-push.outputs.tag }}
