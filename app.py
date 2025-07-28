@@ -2,8 +2,7 @@ import os
 import tempfile
 import logging
 import traceback
-import time
-import subprocess
+import re
 from dotenv import load_dotenv
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
@@ -12,11 +11,16 @@ from telegram.ext import (
 )
 from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.core.credentials import AzureKeyCredential
-from azure.cognitiveservices.speech import SpeechConfig, SpeechSynthesizer, AudioConfig, ResultReason
+from azure.cognitiveservices.speech import SpeechConfig, SpeechSynthesizer, AudioConfig, ResultReason, CancellationReason
 
 # Logging setup
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+HELP_MESSAGE = (
+    "Send me PDFs or images (JPG, PNG, TIFF, BMP, up to 17 MB and 500 pages).\n"
+    "I'll extract the text and send it to you as an audio message!"
+)
 
 # Load environment variables
 load_dotenv()
@@ -39,30 +43,36 @@ LANG_OPTIONS = {
 }
 LANG_CHOICE = 0
 
+def normalize_ocr_text(raw_text):
+    # ... as before ...
+    text = raw_text.replace('\r\n', '\n').replace('\r', '\n')
+    text = re.sub(r'-\s*\n\s*', '', text)
+    text = re.sub(r'(?<!\n)\n(?!\n)', ' ', text)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    text = re.sub(r' +', ' ', text)
+    def fix_paragraph(p):
+        p = p.strip()
+        if p and p[-1] not in '.!?…:;':
+            return p + '.'
+        return p
+    paragraphs = [fix_paragraph(p) for p in text.split('\n\n')]
+    text = '\n\n'.join(paragraphs)
+    return text.strip()
+
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     logger.info(f"User {user_id} requested help")
-    await update.message.reply_text(
-        "Send a photo or PDF to convert its text to speech. "
-        "After uploading, choose the language of the text. "
-        "You'll receive an audio message with speed controls (tap the 1x badge to change speed)."
-    )
+    await update.message.reply_text(HELP_MESSAGE)
 
 async def prompt_for_file(update: Update):
-    await update.message.reply_text(
-        "📥 Please send a photo or PDF to convert to speech."
-    )
+    await update.message.reply_text(HELP_MESSAGE)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     logger.info(f"User {user_id} started the bot")
     await update.message.reply_text(
-        "Welcome to Yonchee T-t-S bot!\n"
-        "Send me a photo or PDF, and I'll convert the text to speech.\n"
-        "After sending a file, you'll be asked to choose the language.\n"
-        "Type /help for more info."
+        f"👋 Welcome to Yonchee Text2Speech bot!\n{HELP_MESSAGE}"
     )
-    await prompt_for_file(update)
 
 async def ask_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -90,7 +100,7 @@ async def ask_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return LANG_CHOICE
 
 def convert_mp3_to_ogg(mp3_path, ogg_path):
-    # Requires ffmpeg installed on your server
+    import subprocess
     result = subprocess.run(
         ['ffmpeg', '-y', '-i', mp3_path, '-c:a', 'libopus', '-b:a', '64k', ogg_path],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE
@@ -111,7 +121,6 @@ async def process_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Invalid choice. Please reply with 1, 2, or 3.")
         return LANG_CHOICE
 
-    # Notify user that processing has started
     processing_message = await update.message.reply_text(
         "⏳ Processing your file and generating audio, please wait..."
     )
@@ -121,7 +130,6 @@ async def process_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
     voice = lang_info["voice"]
 
     try:
-        # OCR
         with open(file_path, "rb") as f:
             poller = doc_client.begin_analyze_document("prebuilt-read", f)
             result = poller.result()
@@ -130,18 +138,19 @@ async def process_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 for line in page.lines:
                     extracted_text += line.content + "\n"
 
-        if not extracted_text.strip():
+        normalized_text = normalize_ocr_text(extracted_text)
+
+        if not normalized_text.strip():
             logger.info(f"User {user_id} uploaded a file with no detectable text")
             await update.message.reply_text("No text found in the document.")
             await prompt_for_file(update)
             await processing_message.delete()
             return ConversationHandler.END
 
-        # TTS (MP3)
         ssml = f"""
 <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="{lang_code}">
   <voice name="{voice}">
-    {extracted_text}
+    {normalized_text}
   </voice>
 </speak>
 """
@@ -151,24 +160,29 @@ async def process_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
         result = synthesizer_with_file.speak_ssml_async(ssml).get()
 
         if result.reason != ResultReason.SynthesizingAudioCompleted:
-            logger.error(f"Speech synthesis error for user {user_id}: {result.error_details}")
-            await update.message.reply_text(f"Speech synthesis failed: {result.error_details}")
+            error_message = "Speech synthesis failed."
+            if result.reason == ResultReason.Canceled:
+                cancellation_details = result.cancellation_details
+                error_message += f" Reason: {cancellation_details.reason}."
+                if cancellation_details.reason == CancellationReason.Error:
+                    error_message += f" Error details: {cancellation_details.error_details}"
+            logger.error(f"Speech synthesis error for user {user_id}: {error_message}")
+            await update.message.reply_text(error_message)
             await prompt_for_file(update)
             await processing_message.delete()
             return ConversationHandler.END
 
-        # Convert to OGG/Opus for voice message
         ogg_path = f"{tempfile.mktemp()}.ogg"
         convert_mp3_to_ogg(audio_path, ogg_path)
 
-        # Send as voice message (enables speed badge)
         with open(ogg_path, "rb") as voice_file:
             await update.message.reply_voice(voice_file)
         await update.message.reply_text("Tip: Tap the 1x badge on the audio to change playback speed.")
 
-        logger.info(f"User {user_id} processed a file with language choice {lang_choice}")
+        # Show the instructions again after audio is sent
+        await update.message.reply_text(HELP_MESSAGE)
 
-        await prompt_for_file(update)
+        logger.info(f"User {user_id} processed a file with language choice {lang_choice}")
 
     except Exception as e:
         logger.error(f"Exception for user {user_id}: {str(e)}")
@@ -176,7 +190,6 @@ async def process_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Error: {str(e)}")
         await prompt_for_file(update)
     finally:
-        # Remove the "processing" message
         try:
             await processing_message.delete()
         except Exception:
