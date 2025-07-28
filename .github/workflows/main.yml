@@ -2,27 +2,23 @@ name: Build, Push, and Deploy Docker image to ACR
 
 on:
   push:
-    branches: [ main, dev ]
+    branches: [main, dev]
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
     outputs:
-      tag: ${{ env.TAG }}
+      tag: ${{ steps.vars.outputs.TAG }}
     steps:
       - uses: actions/checkout@v3
 
-      # Set variables for tag, env file, container app. ENVIRONMENT_NAME no longer needed.
-      - name: Set Deployment Variables
+      - name: Set image tag
+        id: vars
         run: |
           if [[ "${GITHUB_REF##*/}" == "main" ]]; then
-            echo "TAG=latest" >> $GITHUB_ENV
-            echo "ENV_FILE=.env" >> $GITHUB_ENV
-            echo "CONTAINER_APP_NAME=yonchee-bot-prod" >> $GITHUB_ENV
+            echo "TAG=latest" >> $GITHUB_OUTPUT
           else
-            echo "TAG=dev" >> $GITHUB_ENV
-            echo "ENV_FILE=.env.dev" >> $GITHUB_ENV
-            echo "CONTAINER_APP_NAME=yonchee-bot-dev" >> $GITHUB_ENV
+            echo "TAG=dev" >> $GITHUB_OUTPUT
           fi
 
       - name: Log in to Azure Container Registry
@@ -37,9 +33,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ secrets.ACR_LOGIN_SERVER }}/yonchee-bot:${{ env.TAG }}
-          build-args: |
-            ENV_FILE=${{ env.ENV_FILE }}
+          tags: ${{ secrets.ACR_LOGIN_SERVER }}/yonchee-bot:${{ steps.vars.outputs.TAG }}
 
   deploy-dev:
     if: github.ref == 'refs/heads/dev'
@@ -53,17 +47,18 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Debug - List container apps in resource group
-        run: |
-          echo "Listing container apps in resource group: ${{ secrets.AZURE_RESOURCE_GROUP }}"
-          az containerapp list --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} --output table
-
       - name: Deploy to Azure Container App (dev)
         run: |
           az containerapp update \
             --name yonchee-bot-dev \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --image ${{ secrets.ACR_LOGIN_SERVER }}/yonchee-bot:${{ needs.build-and-push.outputs.tag }}
+
+      - name: Restart Container App (apply new secrets if needed)
+        run: |
+          az containerapp restart \
+            --name yonchee-bot-dev \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }}
 
   deploy-prod:
     if: github.ref == 'refs/heads/main'
@@ -77,14 +72,15 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Debug - List container apps in resource group
-        run: |
-          echo "Listing container apps in resource group: ${{ secrets.AZURE_RESOURCE_GROUP }}"
-          az containerapp list --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} --output table
-
       - name: Deploy to Azure Container App (prod)
         run: |
           az containerapp update \
             --name yonchee-bot-prod \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --image ${{ secrets.ACR_LOGIN_SERVER }}/yonchee-bot:${{ needs.build-and-push.outputs.tag }}
+
+      - name: Restart Container App (apply new secrets if needed)
+        run: |
+          az containerapp restart \
+            --name yonchee-bot-prod \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }}
