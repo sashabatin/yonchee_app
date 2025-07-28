@@ -2,8 +2,7 @@ import os
 import tempfile
 import logging
 import traceback
-import time
-import subprocess
+import re
 from dotenv import load_dotenv
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
@@ -38,6 +37,35 @@ LANG_OPTIONS = {
     "3": {"lang_code": "en-US", "voice": "en-US-AriaNeural", "desc": "English"},
 }
 LANG_CHOICE = 0
+
+def normalize_ocr_text(raw_text):
+    """
+    Cleans up OCR-extracted text:
+    - Removes artificial line breaks inside sentences
+    - Preserves real sentence punctuation (.,!? etc.)
+    - Preserves paragraph breaks (multiple \n)
+    - Merges hyphenated line breaks
+    - Adds missing periods at paragraph ends if absent
+    """
+    # Normalize line endings
+    text = raw_text.replace('\r\n', '\n').replace('\r', '\n')
+    # Merge hyphenated breaks: "exam-\nple" -> "example"
+    text = re.sub(r'-\s*\n\s*', '', text)
+    # Replace single \n (not followed or preceded by another \n) with space
+    text = re.sub(r'(?<!\n)\n(?!\n)', ' ', text)
+    # Replace 3+ newlines with double newlines (avoid accidental big gaps)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    # Compress excessive whitespace
+    text = re.sub(r' +', ' ', text)
+    # Add a period if a paragraph ends without punctuation
+    def fix_paragraph(p):
+        p = p.strip()
+        if p and p[-1] not in '.!?…:;':
+            return p + '.'
+        return p
+    paragraphs = [fix_paragraph(p) for p in text.split('\n\n')]
+    text = '\n\n'.join(paragraphs)
+    return text.strip()
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -91,6 +119,7 @@ async def ask_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def convert_mp3_to_ogg(mp3_path, ogg_path):
     # Requires ffmpeg installed on your server
+    import subprocess
     result = subprocess.run(
         ['ffmpeg', '-y', '-i', mp3_path, '-c:a', 'libopus', '-b:a', '64k', ogg_path],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE
@@ -129,8 +158,11 @@ async def process_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
             for page in result.pages:
                 for line in page.lines:
                     extracted_text += line.content + "\n"
+        
+        # --------- NEW: Normalize the text for natural reading ---------
+        normalized_text = normalize_ocr_text(extracted_text)
 
-        if not extracted_text.strip():
+        if not normalized_text.strip():
             logger.info(f"User {user_id} uploaded a file with no detectable text")
             await update.message.reply_text("No text found in the document.")
             await prompt_for_file(update)
@@ -141,7 +173,7 @@ async def process_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ssml = f"""
 <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="{lang_code}">
   <voice name="{voice}">
-    {extracted_text}
+    {normalized_text}
   </voice>
 </speak>
 """
@@ -157,11 +189,10 @@ async def process_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await processing_message.delete()
             return ConversationHandler.END
 
-        # Convert to OGG/Opus for voice message
+        # Convert to OGG/Opus for voice message (Telegram voice)
         ogg_path = f"{tempfile.mktemp()}.ogg"
         convert_mp3_to_ogg(audio_path, ogg_path)
 
-        # Send as voice message (enables speed badge)
         with open(ogg_path, "rb") as voice_file:
             await update.message.reply_voice(voice_file)
         await update.message.reply_text("Tip: Tap the 1x badge on the audio to change playback speed.")
