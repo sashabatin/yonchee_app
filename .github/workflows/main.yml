@@ -54,12 +54,6 @@ jobs:
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --image ${{ secrets.ACR_LOGIN_SERVER }}/yonchee-bot:${{ needs.build-and-push.outputs.tag }}
 
-      - name: Restart Container App (apply new secrets if needed)
-        run: |
-          az containerapp restart \
-            --name yonchee-bot-dev \
-            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }}
-
   deploy-prod:
     if: github.ref == 'refs/heads/main'
     needs: build-and-push
@@ -78,9 +72,3 @@ jobs:
             --name yonchee-bot-prod \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --image ${{ secrets.ACR_LOGIN_SERVER }}/yonchee-bot:${{ needs.build-and-push.outputs.tag }}
-
-      - name: Restart Container App (apply new secrets if needed)
-        run: |
-          az containerapp restart \
-            --name yonchee-bot-prod \
-            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }}
