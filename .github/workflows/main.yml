@@ -12,19 +12,17 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      # Set variables for tag, env file, container app, and env name
+      # Set variables for tag, env file, container app. ENVIRONMENT_NAME no longer needed.
       - name: Set Deployment Variables
         run: |
           if [[ "${GITHUB_REF##*/}" == "main" ]]; then
             echo "TAG=latest" >> $GITHUB_ENV
             echo "ENV_FILE=.env" >> $GITHUB_ENV
             echo "CONTAINER_APP_NAME=yonchee-bot-prod" >> $GITHUB_ENV
-            echo "ENVIRONMENT_NAME=production" >> $GITHUB_ENV
           else
             echo "TAG=dev" >> $GITHUB_ENV
             echo "ENV_FILE=.env.dev" >> $GITHUB_ENV
             echo "CONTAINER_APP_NAME=yonchee-bot-dev" >> $GITHUB_ENV
-            echo "ENVIRONMENT_NAME=dev" >> $GITHUB_ENV
           fi
 
       - name: Log in to Azure Container Registry
@@ -34,7 +32,6 @@ jobs:
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
-      # Use tag/env file variable set above
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
@@ -44,11 +41,12 @@ jobs:
           build-args: |
             ENV_FILE=${{ env.ENV_FILE }}
 
-  deploy:
+  deploy-dev:
+    if: github.ref == 'refs/heads/dev'
     needs: build-and-push
     runs-on: ubuntu-latest
     environment:
-      name: ${{ env.ENVIRONMENT_NAME }}
+      name: dev
     steps:
       - name: Azure Login
         uses: azure/login@v1
@@ -60,9 +58,33 @@ jobs:
           echo "Listing container apps in resource group: ${{ secrets.AZURE_RESOURCE_GROUP }}"
           az containerapp list --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} --output table
 
-      - name: Deploy to Azure Container App
+      - name: Deploy to Azure Container App (dev)
         run: |
           az containerapp update \
-            --name ${{ env.CONTAINER_APP_NAME }} \
+            --name yonchee-bot-dev \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --image ${{ secrets.ACR_LOGIN_SERVER }}/yonchee-bot:${{ needs.build-and-push.outputs.tag }}
+
+  deploy-prod:
+    if: github.ref == 'refs/heads/main'
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment:
+      name: prod
+    steps:
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Debug - List container apps in resource group
+        run: |
+          echo "Listing container apps in resource group: ${{ secrets.AZURE_RESOURCE_GROUP }}"
+          az containerapp list --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} --output table
+
+      - name: Deploy to Azure Container App (prod)
+        run: |
+          az containerapp update \
+            --name yonchee-bot-prod \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --image ${{ secrets.ACR_LOGIN_SERVER }}/yonchee-bot:${{ needs.build-and-push.outputs.tag }}
