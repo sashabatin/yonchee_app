@@ -1,4 +1,4 @@
-name: Build and Push Docker image to ACR
+name: Build, Push, and Deploy Docker image to ACR
 
 on:
   push:
@@ -7,6 +7,8 @@ on:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.vars.outputs.TAG }}
     steps:
       - uses: actions/checkout@v3
 
@@ -32,3 +34,26 @@ jobs:
           context: .
           push: true
           tags: ${{ secrets.ACR_LOGIN_SERVER }}/yonchee-bot:${{ steps.vars.outputs.TAG }}
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment:
+      name: dev  # or "production" for main branch, set up in repo Settings > Environments
+    steps:
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Debug - List container apps in resource group
+        run: |
+          echo "Listing container apps in resource group: ${{ secrets.AZURE_RESOURCE_GROUP }}"
+          az containerapp list --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} --output table
+
+      - name: Deploy to Azure Container App
+        run: |
+          az containerapp update \
+            --name yonchee-bot-dev \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --image ${{ secrets.ACR_LOGIN_SERVER }}/yonchee-bot:${{ needs.build-and-push.outputs.tag }}
