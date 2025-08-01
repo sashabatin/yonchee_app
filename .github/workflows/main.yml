@@ -3,22 +3,33 @@ name: Build, Push, and Deploy Docker image to ACR
 on:
   push:
     branches: [main, dev]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - '.github/**/*.md'
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
     outputs:
-      tag: ${{ steps.vars.outputs.TAG }}
+      short_sha: ${{ steps.vars.outputs.short_sha }}
+      dev_tag: ${{ steps.vars.outputs.dev_tag }}
+      prod_tags: ${{ steps.vars.outputs.prod_tags }}
     steps:
       - uses: actions/checkout@v3
 
-      - name: Set image tag
+      - name: Set image tags
         id: vars
         run: |
+          SHORT_SHA="${GITHUB_SHA::8}"
+          echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
+          # For dev builds
+          if [[ "${GITHUB_REF##*/}" == "dev" ]]; then
+            echo "dev_tag=dev,$SHORT_SHA" >> $GITHUB_OUTPUT
+          fi
+          # For prod builds
           if [[ "${GITHUB_REF##*/}" == "main" ]]; then
-            echo "TAG=latest" >> $GITHUB_OUTPUT
-          else
-            echo "TAG=dev" >> $GITHUB_OUTPUT
+            echo "prod_tags=prod,latest,$SHORT_SHA" >> $GITHUB_OUTPUT
           fi
 
       - name: Log in to Azure Container Registry
@@ -28,12 +39,14 @@ jobs:
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
-      - name: Build and push Docker image
+      - name: Build and push Docker image (prod or dev)
         uses: docker/build-push-action@v4
         with:
           context: .
           push: true
-          tags: ${{ secrets.ACR_LOGIN_SERVER }}/yonchee-bot:${{ steps.vars.outputs.TAG }}
+          tags: |
+            ${{ secrets.ACR_LOGIN_SERVER }}/yonchee-bot:${{ steps.vars.outputs.dev_tag }}
+            ${{ secrets.ACR_LOGIN_SERVER }}/yonchee-bot:${{ steps.vars.outputs.prod_tags }}
 
   deploy-dev:
     if: github.ref == 'refs/heads/dev'
@@ -52,7 +65,7 @@ jobs:
           az containerapp update \
             --name yonchee-bot-dev \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
-            --image ${{ secrets.ACR_LOGIN_SERVER }}/yonchee-bot:${{ needs.build-and-push.outputs.tag }}
+            --image ${{ secrets.ACR_LOGIN_SERVER }}/yonchee-bot:${{ needs.build-and-push.outputs.short_sha }}
 
   deploy-prod:
     if: github.ref == 'refs/heads/main'
@@ -71,4 +84,4 @@ jobs:
           az containerapp update \
             --name yonchee-bot-prod \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
-            --image ${{ secrets.ACR_LOGIN_SERVER }}/yonchee-bot:${{ needs.build-and-push.outputs.tag }}
+            --image ${{ secrets.ACR_LOGIN_SERVER }}/yonchee-bot:${{ needs.build-and-push.outputs.short_sha }}
