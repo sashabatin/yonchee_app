@@ -51,17 +51,31 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      - name: Set Azure Container App Secrets (dev)
+        run: |
+          az containerapp secret set \
+            --name yonchee-bot-dev \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --secrets \
+              azure-form-recognizer-endpoint=${{ secrets.AZURE_FORM_RECOGNIZER_ENDPOINT }} \
+              azure-form-recognizer-key=${{ secrets.AZURE_FORM_RECOGNIZER_KEY }} \
+              azure-speech-api-key=${{ secrets.AZURE_SPEECH_API_KEY }} \
+              azure-region=${{ secrets.AZURE_REGION }} \
+              telegram-api-token-dev=${{ secrets.TELEGRAM_API_TOKEN_DEV }}
+
       - name: Deploy to Azure Container App (dev)
         run: |
           az containerapp update \
             --name yonchee-bot-dev \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --image ${{ secrets.ACR_LOGIN_SERVER }}/yonchee-bot:dev \
-            --set-env-vars BOT_ENV=dev TELEGRAM_API_TOKEN_DEV=${{ secrets.TELEGRAM_API_TOKEN_DEV }} \
-              AZURE_FORM_RECOGNIZER_ENDPOINT=${{ secrets.AZURE_FORM_RECOGNIZER_ENDPOINT }} \
-              AZURE_FORM_RECOGNIZER_KEY=${{ secrets.AZURE_FORM_RECOGNIZER_KEY }} \
-              AZURE_SPEECH_API_KEY=${{ secrets.AZURE_SPEECH_API_KEY }} \
-              AZURE_REGION=${{ secrets.AZURE_REGION }}
+            --set-env-vars \
+              BOT_ENV=dev \
+              TELEGRAM_API_TOKEN_DEV=secretref:telegram-api-token-dev \
+              AZURE_FORM_RECOGNIZER_ENDPOINT=secretref:azure-form-recognizer-endpoint \
+              AZURE_FORM_RECOGNIZER_KEY=secretref:azure-form-recognizer-key \
+              AZURE_SPEECH_API_KEY=secretref:azure-speech-api-key \
+              AZURE_REGION=secretref:azure-region
 
   deploy-prod:
     if: github.ref == 'refs/heads/main'
@@ -75,14 +89,28 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      - name: Set Azure Container App Secrets (prod)
+        run: |
+          az containerapp secret set \
+            --name yonchee-bot-prod \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --secrets \
+              azure-form-recognizer-endpoint=${{ secrets.AZURE_FORM_RECOGNIZER_ENDPOINT }} \
+              azure-form-recognizer-key=${{ secrets.AZURE_FORM_RECOGNIZER_KEY }} \
+              azure-speech-api-key=${{ secrets.AZURE_SPEECH_API_KEY }} \
+              azure-region=${{ secrets.AZURE_REGION }} \
+              telegram-api-token-prod=${{ secrets.TELEGRAM_API_TOKEN_PROD }}
+
       - name: Deploy to Azure Container App (prod)
         run: |
           az containerapp update \
             --name yonchee-bot-prod \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --image ${{ secrets.ACR_LOGIN_SERVER }}/yonchee-bot:prod \
-            --set-env-vars BOT_ENV=prod TELEGRAM_API_TOKEN_PROD=${{ secrets.TELEGRAM_API_TOKEN_PROD }} \
-              AZURE_FORM_RECOGNIZER_ENDPOINT=${{ secrets.AZURE_FORM_RECOGNIZER_ENDPOINT }} \
-              AZURE_FORM_RECOGNIZER_KEY=${{ secrets.AZURE_FORM_RECOGNIZER_KEY }} \
-              AZURE_SPEECH_API_KEY=${{ secrets.AZURE_SPEECH_API_KEY }} \
-              AZURE_REGION=${{ secrets.AZURE_REGION }}
+            --set-env-vars \
+              BOT_ENV=prod \
+              TELEGRAM_API_TOKEN_PROD=secretref:telegram-api-token-prod \
+              AZURE_FORM_RECOGNIZER_ENDPOINT=secretref:azure-form-recognizer-endpoint \
+              AZURE_FORM_RECOGNIZER_KEY=secretref:azure-form-recognizer-key \
+              AZURE_SPEECH_API_KEY=secretref:azure-speech-api-key \
+              AZURE_REGION=secretref:azure-region
