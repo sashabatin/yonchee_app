@@ -3,39 +3,43 @@ import tempfile
 import logging
 import traceback
 import re
+import sys
+
 from dotenv import load_dotenv
-
-load_dotenv()
-
-BOT_ENV = os.environ.get("BOT_ENV", "dev").lower()
-
-if BOT_ENV == "prod":
-    TELEGRAM_API_TOKEN = os.environ["TELEGRAM_API_TOKEN_PROD"]
-else:
-    TELEGRAM_API_TOKEN = os.environ["TELEGRAM_API_TOKEN_DEV"]
-
-DOCUMENT_INTELLIGENCE_ENDPOINT = os.environ["AZURE_FORM_RECOGNIZER_ENDPOINT"]
-DOCUMENT_INTELLIGENCE_KEY = os.environ["AZURE_FORM_RECOGNIZER_KEY"]
-SPEECH_API_KEY = os.environ["AZURE_SPEECH_API_KEY"]
-SPEECH_REGION = os.environ["AZURE_REGION"]
-
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters,
-    ConversationHandler
+    ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters, ConversationHandler
 )
 from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.core.credentials import AzureKeyCredential
 from azure.cognitiveservices.speech import SpeechConfig, SpeechSynthesizer, AudioConfig, ResultReason, CancellationReason
 
-# Logging setup
+REQUIRED_VARS = [
+    "AZURE_FORM_RECOGNIZER_ENDPOINT",
+    "AZURE_FORM_RECOGNIZER_KEY",
+    "AZURE_SPEECH_API_KEY",
+    "AZURE_REGION",
+    "TELEGRAM_API_TOKEN"
+]
+load_dotenv()
+for v in REQUIRED_VARS:
+    if not os.getenv(v):
+        print(f"ERROR: Missing required environment variable: {v}", file=sys.stderr)
+        exit(1)
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 HELP_MESSAGE = (
-    "Send me PDFs or images (JPG, PNG, TIFF, BMP, up to 17 MB and 500 pages).\n"
+    "Send me PDFs or images (JPG, PNG, TIFF, BMP, WebP, up to 17 MB and 500 pages).\n"
     "I'll extract the text and send it to you as an audio message!"
 )
+
+DOCUMENT_INTELLIGENCE_ENDPOINT = os.environ["AZURE_FORM_RECOGNIZER_ENDPOINT"]
+DOCUMENT_INTELLIGENCE_KEY = os.environ["AZURE_FORM_RECOGNIZER_KEY"]
+SPEECH_API_KEY = os.environ["AZURE_SPEECH_API_KEY"]
+SPEECH_REGION = os.environ["AZURE_REGION"]
+TELEGRAM_API_TOKEN = os.environ["TELEGRAM_API_TOKEN"]
 
 doc_client = DocumentIntelligenceClient(
     endpoint=DOCUMENT_INTELLIGENCE_ENDPOINT,
@@ -50,8 +54,20 @@ LANG_OPTIONS = {
 }
 LANG_CHOICE = 0
 
-def normalize_ocr_text(raw_text):
-    # ... as before ...
+SUPPORTED_MIME = {
+    "image/jpeg",
+    "image/png",
+    "image/tiff",
+    "image/bmp",
+    "image/webp",
+    "application/pdf"
+}
+SUPPORTED_EXTENSIONS = {
+    ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".webp", ".pdf"
+}
+MAX_SIZE = 17 * 1024 * 1024
+
+def normalize_ocr_text(raw_text: str) -> str:
     text = raw_text.replace('\r\n', '\n').replace('\r', '\n')
     text = re.sub(r'-\s*\n\s*', '', text)
     text = re.sub(r'(?<!\n)\n(?!\n)', ' ', text)
@@ -62,29 +78,65 @@ def normalize_ocr_text(raw_text):
         if p and p[-1] not in '.!?…:;':
             return p + '.'
         return p
-    paragraphs = [fix_paragraph(p) for p in text.split('\n\n')]
-    text = '\n\n'.join(paragraphs)
-    return text.strip()
+    return '\n\n'.join([fix_paragraph(p) for p in text.split('\n\n')]).strip()
 
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+def convert_mp3_to_ogg(mp3_path: str, ogg_path: str) -> None:
+    import subprocess
+    result = subprocess.run(
+        ['ffmpeg', '-y', '-i', mp3_path, '-c:a', 'libopus', '-b:a', '64k', ogg_path],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    )
+    if result.returncode != 0:
+        logger.error(f"ffmpeg error: {result.stderr.decode(errors='ignore')}")
+        raise RuntimeError("Audio conversion failed.")
+
+def is_supported_file(file) -> bool:
+    mtype = getattr(file, "mime_type", None) or ""
+    file_name = getattr(file, "file_name", None) or ""
+    file_size = getattr(file, "file_size", 0)
+    _, ext = os.path.splitext(file_name.lower())
+    # fallback for photo
+    if not mtype and ext in SUPPORTED_EXTENSIONS:
+        if ext in [".jpg", ".jpeg"]:
+            mtype = "image/jpeg"
+        elif ext == ".png":
+            mtype = "image/png"
+        elif ext == ".tiff" or ext == ".tif":
+            mtype = "image/tiff"
+        elif ext == ".bmp":
+            mtype = "image/bmp"
+        elif ext == ".webp":
+            mtype = "image/webp"
+        elif ext == ".pdf":
+            mtype = "application/pdf"
+    return (mtype in SUPPORTED_MIME) and (file_size <= MAX_SIZE)
+
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
     logger.info(f"User {user_id} requested help")
     await update.message.reply_text(HELP_MESSAGE)
 
-async def prompt_for_file(update: Update):
+async def prompt_for_file(update: Update) -> None:
     await update.message.reply_text(HELP_MESSAGE)
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
     logger.info(f"User {user_id} started the bot")
     await update.message.reply_text(
         f"👋 Welcome to Yonchee Text2Speech bot!\n{HELP_MESSAGE}"
     )
 
-async def ask_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def ask_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_id = update.effective_user.id
     logger.info(f"User {user_id} sent a file or photo")
     file = update.message.document or update.message.photo[-1]
+    if not is_supported_file(file):
+        await update.message.reply_text(
+            "❌ Unsupported file type or file too large. Please send a PDF, JPEG, PNG, TIFF, BMP, or WebP file (max 17MB)."
+        )
+        return ConversationHandler.END
+
     tg_file = await file.get_file()
     file_path = tempfile.mktemp()
     await tg_file.download_to_drive(file_path)
@@ -106,17 +158,7 @@ async def ask_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return LANG_CHOICE
 
-def convert_mp3_to_ogg(mp3_path, ogg_path):
-    import subprocess
-    result = subprocess.run(
-        ['ffmpeg', '-y', '-i', mp3_path, '-c:a', 'libopus', '-b:a', '64k', ogg_path],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE
-    )
-    if result.returncode != 0:
-        logger.error(f"ffmpeg error: {result.stderr.decode()}")
-        raise RuntimeError("Audio conversion failed.")
-
-async def process_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def process_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_id = update.effective_user.id
     lang_choice = update.message.text.strip()
     file_path = context.user_data.get('file_path')
@@ -174,7 +216,7 @@ async def process_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if cancellation_details.reason == CancellationReason.Error:
                     error_message += f" Error details: {cancellation_details.error_details}"
             logger.error(f"Speech synthesis error for user {user_id}: {error_message}")
-            await update.message.reply_text(error_message)
+            await update.message.reply_text("An internal error occurred during speech synthesis. Please try again later.")
             await prompt_for_file(update)
             await processing_message.delete()
             return ConversationHandler.END
@@ -186,15 +228,13 @@ async def process_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_voice(voice_file)
         await update.message.reply_text("Tip: Tap the 1x badge on the audio to change playback speed.")
 
-        # Show the instructions again after audio is sent
         await update.message.reply_text(HELP_MESSAGE)
-
         logger.info(f"User {user_id} processed a file with language choice {lang_choice}")
 
     except Exception as e:
-        logger.error(f"Exception for user {user_id}: {str(e)}")
+        logger.error(f"Exception for user {user_id}: {e!r}")
         logger.error(traceback.format_exc())
-        await update.message.reply_text(f"Error: {str(e)}")
+        await update.message.reply_text("❌ An internal error occurred while processing your request. Please try again later.")
         await prompt_for_file(update)
     finally:
         try:
@@ -205,11 +245,11 @@ async def process_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if path and os.path.exists(path):
                 try:
                     os.remove(path)
-                except Exception:
-                    pass
+                except Exception as cleanup_exc:
+                    logger.warning(f"Failed to remove temp file {path}: {cleanup_exc}")
     return ConversationHandler.END
 
-def main():
+def main() -> None:
     app = ApplicationBuilder().token(TELEGRAM_API_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
