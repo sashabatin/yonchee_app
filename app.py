@@ -4,6 +4,21 @@ import logging
 import traceback
 import re
 from dotenv import load_dotenv
+
+load_dotenv()
+
+BOT_ENV = os.environ.get("BOT_ENV", "dev").lower()
+
+if BOT_ENV == "prod":
+    TELEGRAM_API_TOKEN = os.environ["TELEGRAM_API_TOKEN_PROD"]
+else:
+    TELEGRAM_API_TOKEN = os.environ["TELEGRAM_API_TOKEN_DEV"]
+
+DOCUMENT_INTELLIGENCE_ENDPOINT = os.environ["AZURE_FORM_RECOGNIZER_ENDPOINT"]
+DOCUMENT_INTELLIGENCE_KEY = os.environ["AZURE_FORM_RECOGNIZER_KEY"]
+SPEECH_API_KEY = os.environ["AZURE_SPEECH_API_KEY"]
+SPEECH_REGION = os.environ["AZURE_REGION"]
+
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters,
@@ -21,14 +36,6 @@ HELP_MESSAGE = (
     "Send me PDFs or images (JPG, PNG, TIFF, BMP, up to 17 MB and 500 pages).\n"
     "I'll extract the text and send it to you as an audio message!"
 )
-
-# Load environment variables
-load_dotenv()
-DOCUMENT_INTELLIGENCE_ENDPOINT = os.getenv("AZURE_FORM_RECOGNIZER_ENDPOINT")
-DOCUMENT_INTELLIGENCE_KEY = os.getenv("AZURE_FORM_RECOGNIZER_KEY")
-SPEECH_API_KEY = os.getenv("AZURE_SPEECH_API_KEY")
-SPEECH_REGION = os.getenv("AZURE_REGION")
-TELEGRAM_API_TOKEN = os.getenv("TELEGRAM_API_TOKEN")
 
 doc_client = DocumentIntelligenceClient(
     endpoint=DOCUMENT_INTELLIGENCE_ENDPOINT,
