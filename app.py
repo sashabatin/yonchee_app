@@ -1,6 +1,10 @@
 import os
 import tempfile
 import logging
+try:
+    from opencensus.ext.azure.log_exporter import AzureLogHandler
+except ImportError:
+    AzureLogHandler = None
 import traceback
 import re
 import sys
@@ -27,8 +31,30 @@ for v in REQUIRED_VARS:
         print(f"ERROR: Missing required environment variable: {v}", file=sys.stderr)
         exit(1)
 
+
+class SensitiveDataFilter(logging.Filter):
+    def filter(self, record):
+        # Redact Telegram bot token in URLs
+        if hasattr(record, 'msg') and isinstance(record.msg, str):
+            record.msg = self._redact_token(record.msg)
+        return True
+
+    def _redact_token(self, msg):
+        # Redact Telegram bot token in URLs
+        # Example: https://api.telegram.org/bot<token>/...
+        return re.sub(r'(https://api\.telegram\.org/bot)([0-9]+:[A-Za-z0-9_-]+)', r'\1<REDACTED_TOKEN>', msg)
+
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+for handler in logging.getLogger().handlers:
+    handler.addFilter(SensitiveDataFilter())
+
+# Add AzureLogHandler for Application Insights if available
+if AzureLogHandler:
+    instrumentation_key = os.getenv("APPINSIGHTS_INSTRUMENTATIONKEY")
+    if instrumentation_key:
+        logger.addHandler(AzureLogHandler(connection_string=f"InstrumentationKey={instrumentation_key}"))
 
 HELP_MESSAGE = (
     "Send me PDFs or images (JPG, PNG, TIFF, BMP, WebP, up to 17 MB and 500 pages).\n"
@@ -120,9 +146,30 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 async def prompt_for_file(update: Update) -> None:
     await update.message.reply_text(HELP_MESSAGE)
 
+import requests
+
+def get_country_from_ip(ip: str) -> str:
+    try:
+        resp = requests.get(f"https://ipapi.co/{ip}/country_name/", timeout=2)
+        if resp.status_code == 200:
+            return resp.text.strip()
+    except Exception:
+        pass
+    return "Unknown"
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
-    logger.info(f"User {user_id} started the bot")
+    # Try to get country from IP (if available)
+    ip = update.effective_user.get("ip_address", None) if hasattr(update.effective_user, "get") else None
+    user_country = None
+    if ip:
+        user_country = get_country_from_ip(ip)
+    # Fallback to language code if IP is not available or geolocation fails
+    if not user_country or user_country == "Unknown":
+        lang_code = update.effective_user.language_code[:2] if update.effective_user.language_code else None
+        user_country = lang_code if lang_code else "Unknown"
+    # Log custom event for Application Insights/Log Analytics
+    logger.info(f"UserStartedBot: user_id={user_id}, country={user_country}")
     await update.message.reply_text(
         f"👋 Welcome to Yonchee Text2Speech bot!\n{HELP_MESSAGE}"
     )
