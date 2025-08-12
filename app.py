@@ -1,23 +1,32 @@
 import os
 import tempfile
 import logging
+import traceback
+import re
+import sys
+import platform
+import time
+import html
+from dotenv import load_dotenv
+
 try:
     from opencensus.ext.azure.log_exporter import AzureLogHandler
 except ImportError:
     AzureLogHandler = None
-import traceback
-import re
-import sys
 
-from dotenv import load_dotenv
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters, ConversationHandler
+    ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes,
+    filters, ConversationHandler
 )
 from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.core.credentials import AzureKeyCredential
-from azure.cognitiveservices.speech import SpeechConfig, SpeechSynthesizer, AudioConfig, ResultReason, CancellationReason
+from azure.cognitiveservices.speech import (
+    SpeechConfig, SpeechSynthesizer, AudioConfig, ResultReason, CancellationReason
+)
+import requests
 
+# --- Env setup ---
 REQUIRED_VARS = [
     "AZURE_FORM_RECOGNIZER_ENDPOINT",
     "AZURE_FORM_RECOGNIZER_KEY",
@@ -31,31 +40,27 @@ for v in REQUIRED_VARS:
         print(f"ERROR: Missing required environment variable: {v}", file=sys.stderr)
         exit(1)
 
-
+# --- Logging setup with sensitive info filter ---
 class SensitiveDataFilter(logging.Filter):
     def filter(self, record):
-        # Redact Telegram bot token in URLs
         if hasattr(record, 'msg') and isinstance(record.msg, str):
             record.msg = self._redact_token(record.msg)
         return True
 
     def _redact_token(self, msg):
-        # Redact Telegram bot token in URLs
-        # Example: https://api.telegram.org/bot<token>/...
         return re.sub(r'(https://api\.telegram\.org/bot)([0-9]+:[A-Za-z0-9_-]+)', r'\1<REDACTED_TOKEN>', msg)
-
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 for handler in logging.getLogger().handlers:
     handler.addFilter(SensitiveDataFilter())
 
-# Add AzureLogHandler for Application Insights if available
 if AzureLogHandler:
     instrumentation_key = os.getenv("APPINSIGHTS_INSTRUMENTATIONKEY")
     if instrumentation_key:
         logger.addHandler(AzureLogHandler(connection_string=f"InstrumentationKey={instrumentation_key}"))
 
+# --- Constants and clients ---
 HELP_MESSAGE = (
     "Send me PDFs or images (JPG, PNG, TIFF, BMP, WebP, up to 17 MB and 500 pages).\n"
     "I'll extract the text and send it to you as an audio message!"
@@ -81,18 +86,15 @@ LANG_OPTIONS = {
 LANG_CHOICE = 0
 
 SUPPORTED_MIME = {
-    "image/jpeg",
-    "image/png",
-    "image/tiff",
-    "image/bmp",
-    "image/webp",
-    "application/pdf"
+    "image/jpeg", "image/png", "image/tiff", "image/bmp",
+    "image/webp", "application/pdf"
 }
 SUPPORTED_EXTENSIONS = {
     ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".webp", ".pdf"
 }
 MAX_SIZE = 17 * 1024 * 1024
 
+# --- Util functions ---
 def normalize_ocr_text(raw_text: str) -> str:
     text = raw_text.replace('\r\n', '\n').replace('\r', '\n')
     text = re.sub(r'-\s*\n\s*', '', text)
@@ -106,6 +108,9 @@ def normalize_ocr_text(raw_text: str) -> str:
         return p
     return '\n\n'.join([fix_paragraph(p) for p in text.split('\n\n')]).strip()
 
+def escape_ssml(text: str) -> str:
+    return html.escape(text)
+
 def convert_mp3_to_ogg(mp3_path: str, ogg_path: str) -> None:
     import subprocess
     result = subprocess.run(
@@ -117,17 +122,19 @@ def convert_mp3_to_ogg(mp3_path: str, ogg_path: str) -> None:
         raise RuntimeError("Audio conversion failed.")
 
 def is_supported_file(file) -> bool:
-    mtype = getattr(file, "mime_type", None) or ""
-    file_name = getattr(file, "file_name", None) or ""
+    mtype = getattr(file, "mime_type", None)
+    file_name = getattr(file, "file_name", None)
     file_size = getattr(file, "file_size", 0)
-    _, ext = os.path.splitext(file_name.lower())
-    # fallback for photo
-    if not mtype and ext in SUPPORTED_EXTENSIONS:
-        if ext in [".jpg", ".jpeg"]:
+    is_telegram_photo = hasattr(file, "file_id") and not file_name and (mtype is None or mtype == "image/jpeg")
+    if is_telegram_photo:
+        mtype = "image/jpeg"
+    if not mtype and file_name:
+        _, ext = os.path.splitext(file_name.lower())
+        if ext == ".jpg" or ext == ".jpeg":
             mtype = "image/jpeg"
         elif ext == ".png":
             mtype = "image/png"
-        elif ext == ".tiff" or ext == ".tif":
+        elif ext in (".tif", ".tiff"):
             mtype = "image/tiff"
         elif ext == ".bmp":
             mtype = "image/bmp"
@@ -136,17 +143,6 @@ def is_supported_file(file) -> bool:
         elif ext == ".pdf":
             mtype = "application/pdf"
     return (mtype in SUPPORTED_MIME) and (file_size <= MAX_SIZE)
-
-
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    user_id = update.effective_user.id
-    logger.info(f"User {user_id} requested help")
-    await update.message.reply_text(HELP_MESSAGE)
-
-async def prompt_for_file(update: Update) -> None:
-    await update.message.reply_text(HELP_MESSAGE)
-
-import requests
 
 def get_country_from_ip(ip: str) -> str:
     try:
@@ -157,18 +153,38 @@ def get_country_from_ip(ip: str) -> str:
         pass
     return "Unknown"
 
+def remove_temp_file(path):
+    if path and os.path.exists(path):
+        try:
+            os.remove(path)
+        except Exception as cleanup_exc:
+            logger.warning(f"Failed to remove temp file {path}: {cleanup_exc}")
+            # Retry once on Windows after a short delay
+            if platform.system().lower().startswith("win"):
+                time.sleep(0.5)
+                try:
+                    os.remove(path)
+                except Exception as cleanup_exc2:
+                    logger.warning(f"[Retry] Failed to remove temp file {path}: {cleanup_exc2}")
+
+# --- Command handlers ---
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = update.effective_user.id
+    logger.info(f"User {user_id} requested help")
+    await update.message.reply_text(HELP_MESSAGE)
+
+async def prompt_for_file(update: Update) -> None:
+    await update.message.reply_text(HELP_MESSAGE)
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
-    # Try to get country from IP (if available)
     ip = update.effective_user.get("ip_address", None) if hasattr(update.effective_user, "get") else None
     user_country = None
     if ip:
         user_country = get_country_from_ip(ip)
-    # Fallback to language code if IP is not available or geolocation fails
     if not user_country or user_country == "Unknown":
         lang_code = update.effective_user.language_code[:2] if update.effective_user.language_code else None
         user_country = lang_code if lang_code else "Unknown"
-    # Log custom event for Application Insights/Log Analytics
     logger.info(f"UserStartedBot: user_id={user_id}, country={user_country}")
     await update.message.reply_text(
         f"👋 Welcome to Yonchee Text2Speech bot!\n{HELP_MESSAGE}"
@@ -178,6 +194,13 @@ async def ask_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     user_id = update.effective_user.id
     logger.info(f"User {user_id} sent a file or photo")
     file = update.message.document or update.message.photo[-1]
+    logger.info(
+        f"File attributes for user {user_id}: "
+        f"type={type(file)}, "
+        f"file_name={getattr(file,'file_name',None)}, "
+        f"mime_type={getattr(file,'mime_type',None)}, "
+        f"file_size={getattr(file,'file_size',None)}"
+    )
     if not is_supported_file(file):
         await update.message.reply_text(
             "❌ Unsupported file type or file too large. Please send a PDF, JPEG, PNG, TIFF, BMP, or WebP file (max 17MB)."
@@ -235,6 +258,7 @@ async def process_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                     extracted_text += line.content + "\n"
 
         normalized_text = normalize_ocr_text(extracted_text)
+        escaped_text = escape_ssml(normalized_text)
 
         if not normalized_text.strip():
             logger.info(f"User {user_id} uploaded a file with no detectable text")
@@ -246,7 +270,7 @@ async def process_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         ssml = f"""
 <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="{lang_code}">
   <voice name="{voice}">
-    {normalized_text}
+    {escaped_text}
   </voice>
 </speak>
 """
@@ -254,6 +278,7 @@ async def process_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         audio_config = AudioConfig(filename=audio_path)
         synthesizer_with_file = SpeechSynthesizer(speech_config=speech_config, audio_config=audio_config)
         result = synthesizer_with_file.speak_ssml_async(ssml).get()
+        del synthesizer_with_file
 
         if result.reason != ResultReason.SynthesizingAudioCompleted:
             error_message = "Speech synthesis failed."
@@ -274,7 +299,6 @@ async def process_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         with open(ogg_path, "rb") as voice_file:
             await update.message.reply_voice(voice_file)
         await update.message.reply_text("Tip: Tap the 1x badge on the audio to change playback speed.")
-
         await update.message.reply_text(HELP_MESSAGE)
         logger.info(f"User {user_id} processed a file with language choice {lang_choice}")
 
@@ -289,13 +313,10 @@ async def process_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         except Exception:
             pass
         for path in [file_path, audio_path, ogg_path]:
-            if path and os.path.exists(path):
-                try:
-                    os.remove(path)
-                except Exception as cleanup_exc:
-                    logger.warning(f"Failed to remove temp file {path}: {cleanup_exc}")
+            remove_temp_file(path)
     return ConversationHandler.END
 
+# --- Main entrypoint ---
 def main() -> None:
     app = ApplicationBuilder().token(TELEGRAM_API_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
