@@ -59,7 +59,8 @@ jobs:
               azure-form-recognizer-key=${{ secrets.AZURE_FORM_RECOGNIZER_KEY }} \
               azure-speech-api-key=${{ secrets.AZURE_SPEECH_API_KEY }} \
               azure-region=${{ secrets.AZURE_REGION }} \
-              telegram-api-token=${{ secrets.TELEGRAM_API_TOKEN_DEV }}
+              telegram-api-token=${{ secrets.TELEGRAM_API_TOKEN_DEV }} \
+              appinsights-instrumentationkey=${{ secrets.APPINSIGHTS_INSTRUMENTATIONKEY }}
 
       - name: Deploy to Azure Container App (dev)
         run: |
@@ -73,7 +74,8 @@ jobs:
               AZURE_FORM_RECOGNIZER_ENDPOINT=secretref:azure-form-recognizer-endpoint \
               AZURE_FORM_RECOGNIZER_KEY=secretref:azure-form-recognizer-key \
               AZURE_SPEECH_API_KEY=secretref:azure-speech-api-key \
-              AZURE_REGION=secretref:azure-region
+              AZURE_REGION=secretref:azure-region \
+              APPINSIGHTS_INSTRUMENTATIONKEY=secretref:appinsights-instrumentationkey
 
   deploy-prod:
     if: github.ref == 'refs/heads/main'
@@ -97,7 +99,8 @@ jobs:
               azure-form-recognizer-key=${{ secrets.AZURE_FORM_RECOGNIZER_KEY }} \
               azure-speech-api-key=${{ secrets.AZURE_SPEECH_API_KEY }} \
               azure-region=${{ secrets.AZURE_REGION }} \
-              telegram-api-token=${{ secrets.TELEGRAM_API_TOKEN_PROD }}
+              telegram-api-token=${{ secrets.TELEGRAM_API_TOKEN_PROD }} \
+              appinsights-instrumentationkey=${{ secrets.APPINSIGHTS_INSTRUMENTATIONKEY }}
 
       - name: Deploy to Azure Container App (prod)
         run: |
@@ -111,4 +114,5 @@ jobs:
               AZURE_FORM_RECOGNIZER_ENDPOINT=secretref:azure-form-recognizer-endpoint \
               AZURE_FORM_RECOGNIZER_KEY=secretref:azure-form-recognizer-key \
               AZURE_SPEECH_API_KEY=secretref:azure-speech-api-key \
-              AZURE_REGION=secretref:azure-region
+              AZURE_REGION=secretref:azure-region \
+              APPINSIGHTS_INSTRUMENTATIONKEY=secretref:appinsights-instrumentationkey
