@@ -69,6 +69,7 @@ jobs:
             --name yonchee-bot-dev \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --image ${{ secrets.ACR_LOGIN_SERVER }}/yonchee-bot:dev \
+            --revision-suffix ${{ github.run_number }} \
             --set-env-vars \
               BOT_ENV=dev \
               TELEGRAM_API_TOKEN_DEV=secretref:telegram-api-token-dev \
@@ -107,6 +108,7 @@ jobs:
             --name yonchee-bot-prod \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --image ${{ secrets.ACR_LOGIN_SERVER }}/yonchee-bot:prod \
+            --revision-suffix ${{ github.run_number }} \
             --set-env-vars \
               BOT_ENV=prod \
               TELEGRAM_API_TOKEN_PROD=secretref:telegram-api-token-prod \
