@@ -71,6 +71,7 @@ DOCUMENT_INTELLIGENCE_KEY = os.environ["AZURE_FORM_RECOGNIZER_KEY"]
 SPEECH_API_KEY = os.environ["AZURE_SPEECH_API_KEY"]
 SPEECH_REGION = os.environ["AZURE_REGION"]
 TELEGRAM_API_TOKEN = os.environ["TELEGRAM_API_TOKEN"]
+WEBHOOK_URL = os.environ.get("WEBHOOK_URL", "").rstrip("/")
 
 doc_client = DocumentIntelligenceClient(
     endpoint=DOCUMENT_INTELLIGENCE_ENDPOINT,
@@ -330,7 +331,18 @@ def main() -> None:
         fallbacks=[],
     )
     app.add_handler(conv_handler)
-    app.run_polling()
+
+    if WEBHOOK_URL:
+        logger.info(f"Starting in webhook mode, port 8000")
+        app.run_webhook(
+            listen="0.0.0.0",
+            port=8000,
+            url_path=TELEGRAM_API_TOKEN,
+            webhook_url=f"{WEBHOOK_URL}/{TELEGRAM_API_TOKEN}",
+        )
+    else:
+        logger.info("Starting in polling mode")
+        app.run_polling()
 
 if __name__ == "__main__":
     main()

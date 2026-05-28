@@ -49,6 +49,20 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      - name: Enable external ingress and get webhook URL (dev)
+        run: |
+          az containerapp ingress enable \
+            --name yonchee-bot-dev \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --type external \
+            --target-port 8000 \
+            --transport http 2>/dev/null || true
+          FQDN=$(az containerapp show \
+            --name yonchee-bot-dev \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --query properties.configuration.ingress.fqdn -o tsv)
+          echo "WEBHOOK_URL=https://${FQDN}" >> $GITHUB_ENV
+
       - name: Set Azure Container App Secrets (dev)
         run: |
           az containerapp secret set \
@@ -68,8 +82,11 @@ jobs:
             --name yonchee-bot-dev \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --image ${{ secrets.ACR_LOGIN_SERVER }}/yonchee-bot:dev \
+            --min-replicas 0 \
+            --max-replicas 2 \
             --set-env-vars \
               BOT_ENV=dev \
+              WEBHOOK_URL=${{ env.WEBHOOK_URL }} \
               TELEGRAM_API_TOKEN=secretref:telegram-api-token \
               AZURE_FORM_RECOGNIZER_ENDPOINT=secretref:azure-form-recognizer-endpoint \
               AZURE_FORM_RECOGNIZER_KEY=secretref:azure-form-recognizer-key \
