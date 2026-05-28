@@ -74,7 +74,8 @@ jobs:
               azure-speech-api-key=${{ secrets.AZURE_SPEECH_API_KEY }} \
               azure-region=${{ secrets.AZURE_REGION }} \
               telegram-api-token=${{ secrets.TELEGRAM_API_TOKEN_DEV }} \
-              appinsights-instrumentationkey=${{ secrets.APPINSIGHTS_INSTRUMENTATIONKEY }}
+              appinsights-instrumentationkey=${{ secrets.APPINSIGHTS_INSTRUMENTATIONKEY }} \
+              webhook-url=${{ env.WEBHOOK_URL }}
 
       - name: Deploy to Azure Container App (dev)
         run: |
@@ -87,7 +88,7 @@ jobs:
             --max-replicas 2 \
             --set-env-vars \
               BOT_ENV=dev \
-              WEBHOOK_URL=${{ env.WEBHOOK_URL }} \
+              WEBHOOK_URL=secretref:webhook-url \
               TELEGRAM_API_TOKEN=secretref:telegram-api-token \
               AZURE_FORM_RECOGNIZER_ENDPOINT=secretref:azure-form-recognizer-endpoint \
               AZURE_FORM_RECOGNIZER_KEY=secretref:azure-form-recognizer-key \
