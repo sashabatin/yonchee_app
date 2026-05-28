@@ -321,7 +321,14 @@ async def process_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 # --- Main entrypoint ---
 def main() -> None:
-    app = ApplicationBuilder().token(TELEGRAM_API_TOKEN).build()
+    app = (
+        ApplicationBuilder()
+        .token(TELEGRAM_API_TOKEN)
+        .read_timeout(60)
+        .write_timeout(60)
+        .connect_timeout(15)
+        .build()
+    )
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
 
