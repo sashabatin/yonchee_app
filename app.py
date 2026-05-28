@@ -3,6 +3,7 @@ import tempfile
 import logging
 import traceback
 import re
+from xml.sax.saxutils import escape as xml_escape
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -157,7 +158,7 @@ async def process_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ssml = f"""
 <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="{lang_code}">
   <voice name="{voice}">
-    {normalized_text}
+    {xml_escape(normalized_text)}
   </voice>
 </speak>
 """
