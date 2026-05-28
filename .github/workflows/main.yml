@@ -82,6 +82,7 @@ jobs:
             --name yonchee-bot-dev \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --image ${{ secrets.ACR_LOGIN_SERVER }}/yonchee-bot:dev \
+            --revision-suffix run-${{ github.run_number }} \
             --min-replicas 0 \
             --max-replicas 2 \
             --set-env-vars \
