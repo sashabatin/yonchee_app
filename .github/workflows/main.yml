@@ -94,6 +94,12 @@ jobs:
               AZURE_REGION=secretref:azure-region \
               APPINSIGHTS_INSTRUMENTATIONKEY=secretref:appinsights-instrumentationkey
 
+      - name: Register Telegram webhook (dev)
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_API_TOKEN_DEV }}/setWebhook" \
+            -d "url=${{ env.WEBHOOK_URL }}/${{ secrets.TELEGRAM_API_TOKEN_DEV }}" \
+            | tee /dev/stderr | grep -q '"ok":true'
+
   deploy-prod:
     if: github.ref == 'refs/heads/main'
     needs: build-and-push
