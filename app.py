@@ -63,7 +63,8 @@ if AzureLogHandler:
 # --- Constants and clients ---
 HELP_MESSAGE = (
     "Send me PDFs or images (JPG, PNG, TIFF, BMP, WebP, up to 17 MB and 500 pages).\n"
-    "I'll extract the text and send it to you as an audio message!"
+    "I'll extract the text and send it to you as an audio message!\n\n"
+    "⏱ If the bot hasn't been used in a while, the first response may take up to 10 seconds to wake up."
 )
 
 DOCUMENT_INTELLIGENCE_ENDPOINT = os.environ["AZURE_FORM_RECOGNIZER_ENDPOINT"]
@@ -194,6 +195,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def ask_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_id = update.effective_user.id
     logger.info(f"User {user_id} sent a file or photo")
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
     file = update.message.document or update.message.photo[-1]
     logger.info(
         f"File attributes for user {user_id}: "
