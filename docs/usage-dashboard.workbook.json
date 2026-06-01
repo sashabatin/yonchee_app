@@ -108,6 +108,36 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
+        "query": "traces\n| where message == 'UsageMetrics'\n| where tostring(customDimensions.bot_env) == '{Environment}'\n| summarize daily = sum(toint(customDimensions.ocr_pages)) by bin(timestamp, 1d)\n| order by timestamp asc\n| serialize ['OCR pages (cumulative)'] = row_cumsum(daily)\n| project timestamp, ['OCR pages (cumulative)']",
+        "size": 0,
+        "title": "OCR pages — cumulative (running total)",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "areachart"
+      },
+      "customWidth": "50",
+      "name": "ocr-cumulative"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "traces\n| where message == 'UsageMetrics'\n| where tostring(customDimensions.bot_env) == '{Environment}'\n| summarize daily = sum(toint(customDimensions.tts_chars)) by bin(timestamp, 1d)\n| order by timestamp asc\n| serialize ['TTS characters (cumulative)'] = row_cumsum(daily)\n| project timestamp, ['TTS characters (cumulative)']",
+        "size": 0,
+        "title": "TTS characters — cumulative (running total)",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "areachart"
+      },
+      "customWidth": "50",
+      "name": "tts-cumulative"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
         "query": "traces\n| where message == 'UsageMetrics'\n| where tostring(customDimensions.bot_env) == '{Environment}'\n| summarize ['Files'] = count(), ['OCR pages'] = sum(toint(customDimensions.ocr_pages)), ['TTS characters'] = sum(toint(customDimensions.tts_chars)) by Language = tostring(customDimensions.language)\n| order by ['Files'] desc",
         "size": 0,
         "title": "Breakdown by language",
