@@ -50,6 +50,15 @@ class SensitiveDataFilter(logging.Filter):
                 record.args = {k: self._redact(v) for k, v in record.args.items()}
             elif isinstance(record.args, tuple):
                 record.args = tuple(self._redact(a) for a in record.args)
+        # Pre-format to catch tokens inside non-string args (e.g. httpx.URL objects)
+        try:
+            formatted = record.getMessage()
+            redacted = self._redact(formatted)
+            if redacted != formatted:
+                record.msg = redacted
+                record.args = None
+        except Exception:
+            pass
         return True
 
     def _redact(self, value):
