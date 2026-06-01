@@ -1,3 +1,4 @@
+import asyncio
 import os
 import tempfile
 import logging
@@ -24,8 +25,6 @@ from azure.core.credentials import AzureKeyCredential
 from azure.cognitiveservices.speech import (
     SpeechConfig, SpeechSynthesizer, AudioConfig, ResultReason, CancellationReason
 )
-import requests
-
 # --- Env setup ---
 REQUIRED_VARS = [
     "AZURE_FORM_RECOGNIZER_ENDPOINT",
@@ -42,18 +41,33 @@ for v in REQUIRED_VARS:
 
 # --- Logging setup with sensitive info filter ---
 class SensitiveDataFilter(logging.Filter):
+    _PATTERN = re.compile(r'(https://api\.telegram\.org/bot)([0-9]+:[A-Za-z0-9_-]+)')
+
     def filter(self, record):
-        if hasattr(record, 'msg') and isinstance(record.msg, str):
-            record.msg = self._redact_token(record.msg)
+        record.msg = self._redact(record.msg)
+        if record.args:
+            if isinstance(record.args, dict):
+                record.args = {k: self._redact(v) for k, v in record.args.items()}
+            elif isinstance(record.args, tuple):
+                record.args = tuple(self._redact(a) for a in record.args)
         return True
 
-    def _redact_token(self, msg):
-        return re.sub(r'(https://api\.telegram\.org/bot)([0-9]+:[A-Za-z0-9_-]+)', r'\1<REDACTED_TOKEN>', msg)
+    def _redact(self, value):
+        if isinstance(value, str):
+            return self._PATTERN.sub(r'\1<REDACTED>', value)
+        if isinstance(value, bytes):
+            return self._PATTERN.sub(r'\1<REDACTED>', value.decode('utf-8', errors='ignore')).encode()
+        return value
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+_log_filter = SensitiveDataFilter()
+logging.getLogger().addFilter(_log_filter)
 for handler in logging.getLogger().handlers:
-    handler.addFilter(SensitiveDataFilter())
+    handler.addFilter(_log_filter)
+# httpx/httpcore log full URLs — filter those loggers directly too
+for _lib in ('httpx', 'httpcore', 'telegram'):
+    logging.getLogger(_lib).addFilter(_log_filter)
 
 if AzureLogHandler:
     instrumentation_key = os.getenv("APPINSIGHTS_INSTRUMENTATIONKEY")
@@ -73,6 +87,7 @@ SPEECH_API_KEY = os.environ["AZURE_SPEECH_API_KEY"]
 SPEECH_REGION = os.environ["AZURE_REGION"]
 TELEGRAM_API_TOKEN = os.environ["TELEGRAM_API_TOKEN"]
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL", "").rstrip("/")
+WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
 
 doc_client = DocumentIntelligenceClient(
     endpoint=DOCUMENT_INTELLIGENCE_ENDPOINT,
@@ -146,15 +161,6 @@ def is_supported_file(file) -> bool:
             mtype = "application/pdf"
     return (mtype in SUPPORTED_MIME) and (file_size <= MAX_SIZE)
 
-def get_country_from_ip(ip: str) -> str:
-    try:
-        resp = requests.get(f"https://ipapi.co/{ip}/country_name/", timeout=2)
-        if resp.status_code == 200:
-            return resp.text.strip()
-    except Exception:
-        pass
-    return "Unknown"
-
 def remove_temp_file(path):
     if path and os.path.exists(path):
         try:
@@ -169,6 +175,14 @@ def remove_temp_file(path):
                 except Exception as cleanup_exc2:
                     logger.warning(f"[Retry] Failed to remove temp file {path}: {cleanup_exc2}")
 
+async def _keep_typing(bot, chat_id: int, stop: asyncio.Event) -> None:
+    while not stop.is_set():
+        try:
+            await bot.send_chat_action(chat_id=chat_id, action="typing")
+        except Exception:
+            break
+        await asyncio.sleep(4)
+
 # --- Command handlers ---
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
@@ -180,14 +194,8 @@ async def prompt_for_file(update: Update) -> None:
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
-    ip = update.effective_user.get("ip_address", None) if hasattr(update.effective_user, "get") else None
-    user_country = None
-    if ip:
-        user_country = get_country_from_ip(ip)
-    if not user_country or user_country == "Unknown":
-        lang_code = update.effective_user.language_code[:2] if update.effective_user.language_code else None
-        user_country = lang_code if lang_code else "Unknown"
-    logger.info(f"UserStartedBot: user_id={user_id}, country={user_country}")
+    lang_code = update.effective_user.language_code[:2] if update.effective_user.language_code else "Unknown"
+    logger.info(f"UserStartedBot: user_id={user_id}, lang={lang_code}")
     await update.message.reply_text(
         f"👋 Welcome to Yonchee Text2Speech bot!\n{HELP_MESSAGE}"
     )
@@ -246,6 +254,9 @@ async def process_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     processing_message = await update.message.reply_text(
         "⏳ Processing your file and generating audio, please wait..."
     )
+
+    stop_typing = asyncio.Event()
+    typing_task = asyncio.create_task(_keep_typing(context.bot, update.effective_chat.id, stop_typing))
 
     lang_info = LANG_OPTIONS[lang_choice]
     lang_code = lang_info["lang_code"]
@@ -311,6 +322,12 @@ async def process_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await update.message.reply_text("❌ An internal error occurred while processing your request. Please try again later.")
         await prompt_for_file(update)
     finally:
+        stop_typing.set()
+        typing_task.cancel()
+        try:
+            await typing_task
+        except asyncio.CancelledError:
+            pass
         try:
             await processing_message.delete()
         except Exception:
@@ -348,6 +365,7 @@ def main() -> None:
             port=8000,
             url_path=TELEGRAM_API_TOKEN,
             webhook_url=f"{WEBHOOK_URL}/{TELEGRAM_API_TOKEN}",
+            secret_token=WEBHOOK_SECRET or None,
         )
     else:
         logger.info("Starting in polling mode")
