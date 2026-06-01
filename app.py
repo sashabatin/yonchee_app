@@ -97,6 +97,22 @@ SPEECH_REGION = os.environ["AZURE_REGION"]
 TELEGRAM_API_TOKEN = os.environ["TELEGRAM_API_TOKEN"]
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL", "").rstrip("/")
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
+BOT_ENV = os.environ.get("BOT_ENV", "local")
+
+
+def log_usage(user_id: int, language: str, ocr_pages: int, tts_chars: int) -> None:
+    """Emit a structured usage record to App Insights (lands in the traces table)."""
+    logger.info(
+        "UsageMetrics",
+        extra={"custom_dimensions": {
+            "bot_env": BOT_ENV,
+            "event_type": "file_processed",
+            "language": language,
+            "ocr_pages": ocr_pages,
+            "tts_chars": tts_chars,
+            "user_id": user_id,
+        }}
+    )
 
 doc_client = DocumentIntelligenceClient(
     endpoint=DOCUMENT_INTELLIGENCE_ENDPOINT,
@@ -275,6 +291,7 @@ async def process_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         with open(file_path, "rb") as f:
             poller = doc_client.begin_analyze_document("prebuilt-read", f)
             result = poller.result()
+            ocr_pages = len(result.pages)
             extracted_text = ""
             for page in result.pages:
                 for line in page.lines:
@@ -324,6 +341,7 @@ async def process_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await update.message.reply_text("Tip: Tap the 1x badge on the audio to change playback speed.")
         await update.message.reply_text(HELP_MESSAGE)
         logger.info(f"User {user_id} processed a file with language choice {lang_choice}")
+        log_usage(user_id, lang_info["desc"], ocr_pages, len(normalized_text))
 
     except Exception as e:
         logger.error(f"Exception for user {user_id}: {e!r}")

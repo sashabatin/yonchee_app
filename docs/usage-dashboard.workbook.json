@@ -1,0 +1,123 @@
+{
+  "version": "Notebook/1.0",
+  "items": [
+    {
+      "type": 1,
+      "content": {
+        "json": "# Yonchee Bot — Usage & Cost Drivers\n\nTracks the two things Azure actually bills for: **OCR pages** (Document Intelligence) and **TTS characters** (Speech). Use the **Environment** filter to switch between dev and prod."
+      },
+      "name": "title"
+    },
+    {
+      "type": 9,
+      "content": {
+        "version": "KqlParameterItem/1.0",
+        "parameters": [
+          {
+            "id": "time-range-param",
+            "version": "KqlParameterItem/1.0",
+            "name": "TimeRange",
+            "label": "Time range",
+            "type": 4,
+            "isRequired": true,
+            "value": { "durationMs": 2592000000 },
+            "typeSettings": {
+              "selectableValues": [
+                { "durationMs": 86400000 },
+                { "durationMs": 604800000 },
+                { "durationMs": 2592000000 },
+                { "durationMs": 7776000000 }
+              ]
+            }
+          },
+          {
+            "id": "environment-param",
+            "version": "KqlParameterItem/1.0",
+            "name": "Environment",
+            "label": "Environment",
+            "type": 2,
+            "isRequired": true,
+            "query": "traces\n| where message == 'UsageMetrics'\n| extend bot_env = tostring(customDimensions.bot_env)\n| distinct bot_env\n| order by bot_env asc",
+            "value": "dev",
+            "typeSettings": { "additionalResourceOptions": [] },
+            "queryType": 0,
+            "resourceType": "microsoft.insights/components"
+          }
+        ],
+        "style": "pills",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components"
+      },
+      "name": "parameters"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let data = traces\n| where message == 'UsageMetrics'\n| where tostring(customDimensions.bot_env) == '{Environment}';\nunion\n(data | summarize Metric = 'Files processed', Value = todouble(count())),\n(data | summarize Metric = 'OCR pages', Value = todouble(sum(toint(customDimensions.ocr_pages)))),\n(data | summarize Metric = 'TTS characters', Value = todouble(sum(toint(customDimensions.tts_chars))))",
+        "size": 4,
+        "title": "Totals for selected period",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "tiles",
+        "tileSettings": {
+          "titleContent": { "columnMatch": "Metric", "formatter": 1 },
+          "leftContent": {
+            "columnMatch": "Value",
+            "formatter": 12,
+            "formatOptions": { "palette": "auto" },
+            "numberFormat": { "unit": 17, "options": { "maximumSignificantDigits": 4 } }
+          },
+          "showBorder": true
+        }
+      },
+      "name": "totals-tiles"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "traces\n| where message == 'UsageMetrics'\n| where tostring(customDimensions.bot_env) == '{Environment}'\n| summarize ['OCR pages'] = sum(toint(customDimensions.ocr_pages)) by bin(timestamp, 1d)\n| order by timestamp asc",
+        "size": 0,
+        "title": "OCR pages over time (Document Intelligence)",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "timechart"
+      },
+      "customWidth": "50",
+      "name": "ocr-timechart"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "traces\n| where message == 'UsageMetrics'\n| where tostring(customDimensions.bot_env) == '{Environment}'\n| summarize ['TTS characters'] = sum(toint(customDimensions.tts_chars)) by bin(timestamp, 1d)\n| order by timestamp asc",
+        "size": 0,
+        "title": "TTS characters over time (Speech)",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "timechart"
+      },
+      "customWidth": "50",
+      "name": "tts-timechart"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "traces\n| where message == 'UsageMetrics'\n| where tostring(customDimensions.bot_env) == '{Environment}'\n| summarize ['Files'] = count(), ['OCR pages'] = sum(toint(customDimensions.ocr_pages)), ['TTS characters'] = sum(toint(customDimensions.tts_chars)) by Language = tostring(customDimensions.language)\n| order by ['Files'] desc",
+        "size": 0,
+        "title": "Breakdown by language",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "table"
+      },
+      "name": "language-breakdown"
+    }
+  ],
+  "$schema": "https://github.com/Microsoft/Application-Insights-Workbooks/blob/master/schema/workbook.json"
+}
