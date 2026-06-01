@@ -4,7 +4,7 @@
     {
       "type": 1,
       "content": {
-        "json": "# Yonchee Bot — Usage & Cost Drivers\n\nTracks the two things Azure actually bills for: **OCR pages** (Document Intelligence) and **TTS characters** (Speech). Use the **Environment** filter to switch between dev and prod."
+        "json": "# Yonchee Bot — Usage, Cost & Health\n\nUse the **Environment** filter to switch between dev and prod. Cost figures are **estimates** based on public Azure list prices and may differ from your actual bill (region/tier/commitment discounts)."
       },
       "name": "title"
     },
@@ -38,7 +38,7 @@
             "type": 2,
             "isRequired": true,
             "query": "traces\n| where message == 'UsageMetrics'\n| extend bot_env = tostring(customDimensions.bot_env)\n| distinct bot_env\n| order by bot_env asc",
-            "value": "dev",
+            "value": "prod",
             "typeSettings": { "additionalResourceOptions": [] },
             "queryType": 0,
             "resourceType": "microsoft.insights/components"
@@ -51,10 +51,39 @@
       "name": "parameters"
     },
     {
+      "type": 1,
+      "content": { "json": "## 💰 Estimated cost" },
+      "name": "header-cost"
+    },
+    {
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "let data = traces\n| where message == 'UsageMetrics'\n| where tostring(customDimensions.bot_env) == '{Environment}';\nunion\n(data | summarize Metric = 'Files processed', Value = todouble(count())),\n(data | summarize Metric = 'OCR pages', Value = todouble(sum(toint(customDimensions.ocr_pages)))),\n(data | summarize Metric = 'TTS characters', Value = todouble(sum(toint(customDimensions.tts_chars))))",
+        "query": "let d = traces | where message == 'UsageMetrics' | where tostring(customDimensions.bot_env) == '{Environment}' | where tostring(customDimensions.status) != 'failure';\nlet pages = todouble(coalesce(toscalar(d | summarize sum(toint(customDimensions.ocr_pages))), 0));\nlet chars = todouble(coalesce(toscalar(d | summarize sum(toint(customDimensions.tts_chars))), 0));\nunion\n(print Metric = 'OCR cost ($)', Value = round(pages * 0.0015, 2)),\n(print Metric = 'TTS cost ($)', Value = round(chars * 0.000016, 2)),\n(print Metric = 'Total est. cost ($)', Value = round(pages * 0.0015 + chars * 0.000016, 2))",
+        "size": 4,
+        "title": "Estimated Azure cost for selected period",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "tiles",
+        "tileSettings": {
+          "titleContent": { "columnMatch": "Metric", "formatter": 1 },
+          "leftContent": { "columnMatch": "Value", "formatter": 12, "formatOptions": { "palette": "auto" }, "numberFormat": { "unit": 0, "options": { "style": "decimal", "maximumFractionDigits": 2 } } },
+          "showBorder": true
+        }
+      },
+      "name": "cost-tiles"
+    },
+    {
+      "type": 1,
+      "content": { "json": "## 📈 Usage volume" },
+      "name": "header-usage"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let data = traces\n| where message == 'UsageMetrics'\n| where tostring(customDimensions.bot_env) == '{Environment}'\n| where tostring(customDimensions.status) != 'failure';\nunion\n(data | summarize Metric = 'Files processed', Value = todouble(count())),\n(data | summarize Metric = 'OCR pages', Value = todouble(sum(toint(customDimensions.ocr_pages)))),\n(data | summarize Metric = 'TTS characters', Value = todouble(sum(toint(customDimensions.tts_chars))))",
         "size": 4,
         "title": "Totals for selected period",
         "timeContextFromParameter": "TimeRange",
@@ -63,12 +92,7 @@
         "visualization": "tiles",
         "tileSettings": {
           "titleContent": { "columnMatch": "Metric", "formatter": 1 },
-          "leftContent": {
-            "columnMatch": "Value",
-            "formatter": 12,
-            "formatOptions": { "palette": "auto" },
-            "numberFormat": { "unit": 17, "options": { "maximumSignificantDigits": 4 } }
-          },
+          "leftContent": { "columnMatch": "Value", "formatter": 12, "formatOptions": { "palette": "auto" }, "numberFormat": { "unit": 17, "options": { "maximumSignificantDigits": 4 } } },
           "showBorder": true
         }
       },
@@ -78,37 +102,7 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "traces\n| where message == 'UsageMetrics'\n| where tostring(customDimensions.bot_env) == '{Environment}'\n| summarize ['OCR pages'] = sum(toint(customDimensions.ocr_pages)) by bin(timestamp, 1d)\n| order by timestamp asc",
-        "size": 0,
-        "title": "OCR pages over time (Document Intelligence)",
-        "timeContextFromParameter": "TimeRange",
-        "queryType": 0,
-        "resourceType": "microsoft.insights/components",
-        "visualization": "timechart"
-      },
-      "customWidth": "50",
-      "name": "ocr-timechart"
-    },
-    {
-      "type": 3,
-      "content": {
-        "version": "KqlItem/1.0",
-        "query": "traces\n| where message == 'UsageMetrics'\n| where tostring(customDimensions.bot_env) == '{Environment}'\n| summarize ['TTS characters'] = sum(toint(customDimensions.tts_chars)) by bin(timestamp, 1d)\n| order by timestamp asc",
-        "size": 0,
-        "title": "TTS characters over time (Speech)",
-        "timeContextFromParameter": "TimeRange",
-        "queryType": 0,
-        "resourceType": "microsoft.insights/components",
-        "visualization": "timechart"
-      },
-      "customWidth": "50",
-      "name": "tts-timechart"
-    },
-    {
-      "type": 3,
-      "content": {
-        "version": "KqlItem/1.0",
-        "query": "traces\n| where message == 'UsageMetrics'\n| where tostring(customDimensions.bot_env) == '{Environment}'\n| summarize daily = sum(toint(customDimensions.ocr_pages)) by bin(timestamp, 1d)\n| order by timestamp asc\n| serialize ['OCR pages (cumulative)'] = row_cumsum(daily)\n| project timestamp, ['OCR pages (cumulative)']",
+        "query": "traces\n| where message == 'UsageMetrics'\n| where tostring(customDimensions.bot_env) == '{Environment}'\n| where tostring(customDimensions.status) != 'failure'\n| summarize daily = sum(toint(customDimensions.ocr_pages)) by bin(timestamp, 1d)\n| order by timestamp asc\n| serialize ['OCR pages (cumulative)'] = row_cumsum(daily)\n| project timestamp, ['OCR pages (cumulative)']",
         "size": 0,
         "title": "OCR pages — cumulative (running total)",
         "timeContextFromParameter": "TimeRange",
@@ -123,7 +117,7 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "traces\n| where message == 'UsageMetrics'\n| where tostring(customDimensions.bot_env) == '{Environment}'\n| summarize daily = sum(toint(customDimensions.tts_chars)) by bin(timestamp, 1d)\n| order by timestamp asc\n| serialize ['TTS characters (cumulative)'] = row_cumsum(daily)\n| project timestamp, ['TTS characters (cumulative)']",
+        "query": "traces\n| where message == 'UsageMetrics'\n| where tostring(customDimensions.bot_env) == '{Environment}'\n| where tostring(customDimensions.status) != 'failure'\n| summarize daily = sum(toint(customDimensions.tts_chars)) by bin(timestamp, 1d)\n| order by timestamp asc\n| serialize ['TTS characters (cumulative)'] = row_cumsum(daily)\n| project timestamp, ['TTS characters (cumulative)']",
         "size": 0,
         "title": "TTS characters — cumulative (running total)",
         "timeContextFromParameter": "TimeRange",
@@ -138,7 +132,7 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "traces\n| where message == 'UsageMetrics'\n| where tostring(customDimensions.bot_env) == '{Environment}'\n| summarize ['Files'] = count(), ['OCR pages'] = sum(toint(customDimensions.ocr_pages)), ['TTS characters'] = sum(toint(customDimensions.tts_chars)) by Language = tostring(customDimensions.language)\n| order by ['Files'] desc",
+        "query": "traces\n| where message == 'UsageMetrics'\n| where tostring(customDimensions.bot_env) == '{Environment}'\n| where tostring(customDimensions.status) != 'failure'\n| summarize ['Files'] = count(), ['OCR pages'] = sum(toint(customDimensions.ocr_pages)), ['TTS characters'] = sum(toint(customDimensions.tts_chars)) by Language = tostring(customDimensions.language)\n| order by ['Files'] desc",
         "size": 0,
         "title": "Breakdown by language",
         "timeContextFromParameter": "TimeRange",
@@ -147,6 +141,274 @@
         "visualization": "table"
       },
       "name": "language-breakdown"
+    },
+    {
+      "type": 1,
+      "content": { "json": "## 👥 Users" },
+      "name": "header-users"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let data = traces | where message == 'UsageMetrics' | where tostring(customDimensions.bot_env) == '{Environment}';\nunion\n(data | summarize Metric = 'Unique users', Value = todouble(dcount(tostring(customDimensions.user_id)))),\n(data | where tostring(customDimensions.status) != 'failure' | summarize Metric = 'Successful requests', Value = todouble(count()))",
+        "size": 4,
+        "title": "User totals",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "tiles",
+        "tileSettings": {
+          "titleContent": { "columnMatch": "Metric", "formatter": 1 },
+          "leftContent": { "columnMatch": "Value", "formatter": 12, "formatOptions": { "palette": "auto" }, "numberFormat": { "unit": 17, "options": { "maximumSignificantDigits": 4 } } },
+          "showBorder": true
+        }
+      },
+      "name": "user-tiles"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "traces\n| where message == 'UsageMetrics'\n| where tostring(customDimensions.bot_env) == '{Environment}'\n| summarize ['Active users'] = dcount(tostring(customDimensions.user_id)) by bin(timestamp, 1d)\n| order by timestamp asc",
+        "size": 0,
+        "title": "Active users per day",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "timechart"
+      },
+      "customWidth": "50",
+      "name": "active-users"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "traces\n| where message == 'UsageMetrics'\n| where tostring(customDimensions.bot_env) == '{Environment}'\n| where tostring(customDimensions.status) != 'failure'\n| summarize Files = count(), ['OCR pages'] = sum(toint(customDimensions.ocr_pages)), ['TTS chars'] = sum(toint(customDimensions.tts_chars)) by User = tostring(customDimensions.user_id)\n| order by Files desc\n| take 20",
+        "size": 0,
+        "title": "Top 20 users",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "table"
+      },
+      "customWidth": "50",
+      "name": "top-users"
+    },
+    {
+      "type": 1,
+      "content": { "json": "## ✅ Reliability" },
+      "name": "header-reliability"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let d = traces | where message == 'UsageMetrics' | where tostring(customDimensions.bot_env) == '{Environment}';\nlet total = todouble(coalesce(toscalar(d | summarize count()), 0));\nlet fails = todouble(coalesce(toscalar(d | summarize countif(tostring(customDimensions.status) == 'failure')), 0));\nunion\n(print Metric = 'Total requests', Value = total),\n(print Metric = 'Failures', Value = fails),\n(print Metric = 'Success rate %', Value = iff(total == 0, 100.0, round(100.0 * (total - fails) / total, 1)))",
+        "size": 4,
+        "title": "Reliability",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "tiles",
+        "tileSettings": {
+          "titleContent": { "columnMatch": "Metric", "formatter": 1 },
+          "leftContent": { "columnMatch": "Value", "formatter": 12, "formatOptions": { "palette": "auto" }, "numberFormat": { "unit": 0, "options": { "style": "decimal", "maximumFractionDigits": 1 } } },
+          "showBorder": true
+        }
+      },
+      "name": "reliability-tiles"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "traces\n| where message == 'UsageMetrics'\n| where tostring(customDimensions.bot_env) == '{Environment}'\n| where tostring(customDimensions.status) == 'failure'\n| summarize Count = count() by Reason = tostring(customDimensions.reason)\n| order by Count desc",
+        "size": 0,
+        "title": "Failures by reason",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "piechart"
+      },
+      "customWidth": "50",
+      "name": "failures-by-reason"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "traces\n| where message == 'UsageMetrics'\n| where tostring(customDimensions.bot_env) == '{Environment}'\n| summarize Success = countif(tostring(customDimensions.status) != 'failure'), Failure = countif(tostring(customDimensions.status) == 'failure') by bin(timestamp, 1d)\n| order by timestamp asc",
+        "size": 0,
+        "title": "Success vs failure over time",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "barchart"
+      },
+      "customWidth": "50",
+      "name": "success-fail-time"
+    },
+    {
+      "type": 1,
+      "content": { "json": "## ⏱ Performance (processing time, excludes cold start)" },
+      "name": "header-performance"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let d = traces | where message == 'UsageMetrics' | where tostring(customDimensions.bot_env) == '{Environment}' | where isnotempty(customDimensions.duration_ms) | extend dur = toint(customDimensions.duration_ms);\nunion\n(d | summarize Metric = 'p50 latency (s)', Value = round(percentile(dur, 50) / 1000.0, 1)),\n(d | summarize Metric = 'p95 latency (s)', Value = round(percentile(dur, 95) / 1000.0, 1)),\n(d | summarize Metric = 'Max latency (s)', Value = round(todouble(max(dur)) / 1000.0, 1))",
+        "size": 4,
+        "title": "Processing latency",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "tiles",
+        "tileSettings": {
+          "titleContent": { "columnMatch": "Metric", "formatter": 1 },
+          "leftContent": { "columnMatch": "Value", "formatter": 12, "formatOptions": { "palette": "auto" }, "numberFormat": { "unit": 0, "options": { "style": "decimal", "maximumFractionDigits": 1 } } },
+          "showBorder": true
+        }
+      },
+      "name": "latency-tiles"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "traces\n| where message == 'UsageMetrics'\n| where tostring(customDimensions.bot_env) == '{Environment}'\n| where isnotempty(customDimensions.duration_ms)\n| summarize ['p50 (s)'] = round(percentile(toint(customDimensions.duration_ms), 50) / 1000.0, 1), ['p95 (s)'] = round(percentile(toint(customDimensions.duration_ms), 95) / 1000.0, 1) by bin(timestamp, 1d)\n| order by timestamp asc",
+        "size": 0,
+        "title": "Processing latency over time",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "timechart"
+      },
+      "name": "latency-time"
+    },
+    {
+      "type": 1,
+      "content": { "json": "## 📄 File insights" },
+      "name": "header-files"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "traces\n| where message == 'UsageMetrics'\n| where tostring(customDimensions.bot_env) == '{Environment}'\n| where isnotempty(customDimensions.file_type)\n| summarize Count = count() by ['File type'] = tostring(customDimensions.file_type)",
+        "size": 0,
+        "title": "File type breakdown",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "piechart"
+      },
+      "customWidth": "50",
+      "name": "file-type"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "traces\n| where message == 'UsageMetrics'\n| where tostring(customDimensions.bot_env) == '{Environment}'\n| where isnotempty(customDimensions.file_size_kb)\n| extend kb = toint(customDimensions.file_size_kb)\n| summarize Count = count() by ['Size'] = case(kb < 100, '1. <100 KB', kb < 500, '2. 100-500 KB', kb < 2000, '3. 0.5-2 MB', kb < 5000, '4. 2-5 MB', '5. >5 MB')\n| order by ['Size'] asc",
+        "size": 0,
+        "title": "File size distribution",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "barchart"
+      },
+      "customWidth": "50",
+      "name": "file-size"
+    },
+    {
+      "type": 1,
+      "content": { "json": "## 🖥 Infrastructure (Azure Monitor metrics)\n\nThese charts read platform metrics from the Container App resource. Pick which app to show with the **Container App** selector below (separate from the Environment filter above)." },
+      "name": "header-infra"
+    },
+    {
+      "type": 9,
+      "content": {
+        "version": "KqlParameterItem/1.0",
+        "parameters": [
+          {
+            "id": "containerapp-param",
+            "version": "KqlParameterItem/1.0",
+            "name": "ContainerApp",
+            "label": "Container App",
+            "type": 2,
+            "isRequired": true,
+            "query": "[{\"value\":\"/subscriptions/afca76e1-8370-4362-a06b-13672e9a2e52/resourceGroups/younchee-bot-rg/providers/Microsoft.App/containerapps/yonchee-bot-prod\",\"label\":\"prod\",\"selected\":true},{\"value\":\"/subscriptions/afca76e1-8370-4362-a06b-13672e9a2e52/resourceGroups/younchee-bot-rg/providers/Microsoft.App/containerapps/yonchee-bot-dev\",\"label\":\"dev\"}]",
+            "queryType": 8,
+            "typeSettings": { "additionalResourceOptions": [] }
+          }
+        ],
+        "style": "pills",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components"
+      },
+      "name": "infra-parameters"
+    },
+    {
+      "type": 10,
+      "content": {
+        "chartId": "metric-replicas",
+        "version": "MetricsItem/2.0",
+        "size": 0,
+        "chartType": 2,
+        "resourceType": "microsoft.app/containerapps",
+        "metricScope": 0,
+        "resourceIds": [ "{ContainerApp}" ],
+        "timeContextFromParameter": "TimeRange",
+        "metrics": [
+          { "namespace": "microsoft.app/containerapps", "metric": "microsoft.app/containerapps--Replicas", "aggregation": 4, "splitBy": null }
+        ],
+        "title": "Replica count (instances) — shows scale-to-zero",
+        "gridSettings": { "rowLimit": 10000 }
+      },
+      "name": "metric-replicas"
+    },
+    {
+      "type": 10,
+      "content": {
+        "chartId": "metric-cpu",
+        "version": "MetricsItem/2.0",
+        "size": 0,
+        "chartType": 2,
+        "resourceType": "microsoft.app/containerapps",
+        "metricScope": 0,
+        "resourceIds": [ "{ContainerApp}" ],
+        "timeContextFromParameter": "TimeRange",
+        "metrics": [
+          { "namespace": "microsoft.app/containerapps", "metric": "microsoft.app/containerapps--UsageNanoCores", "aggregation": 4, "splitBy": null }
+        ],
+        "title": "CPU usage (nanocores)",
+        "gridSettings": { "rowLimit": 10000 }
+      },
+      "customWidth": "50",
+      "name": "metric-cpu"
+    },
+    {
+      "type": 10,
+      "content": {
+        "chartId": "metric-memory",
+        "version": "MetricsItem/2.0",
+        "size": 0,
+        "chartType": 2,
+        "resourceType": "microsoft.app/containerapps",
+        "metricScope": 0,
+        "resourceIds": [ "{ContainerApp}" ],
+        "timeContextFromParameter": "TimeRange",
+        "metrics": [
+          { "namespace": "microsoft.app/containerapps", "metric": "microsoft.app/containerapps--WorkingSetBytes", "aggregation": 4, "splitBy": null }
+        ],
+        "title": "Memory working set (bytes)",
+        "gridSettings": { "rowLimit": 10000 }
+      },
+      "customWidth": "50",
+      "name": "metric-memory"
     }
   ],
   "$schema": "https://github.com/Microsoft/Application-Insights-Workbooks/blob/master/schema/workbook.json"

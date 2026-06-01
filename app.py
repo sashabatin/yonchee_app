@@ -100,19 +100,39 @@ WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
 BOT_ENV = os.environ.get("BOT_ENV", "local")
 
 
-def log_usage(user_id: int, language: str, ocr_pages: int, tts_chars: int) -> None:
-    """Emit a structured usage record to App Insights (lands in the traces table)."""
-    logger.info(
-        "UsageMetrics",
-        extra={"custom_dimensions": {
-            "bot_env": BOT_ENV,
-            "event_type": "file_processed",
-            "language": language,
-            "ocr_pages": ocr_pages,
-            "tts_chars": tts_chars,
-            "user_id": user_id,
-        }}
-    )
+def log_usage(user_id: int, status: str, reason: str = None, language: str = None,
+              ocr_pages: int = None, tts_chars: int = None, file_type: str = None,
+              file_size_kb: int = None, duration_ms: int = None) -> None:
+    """Emit a structured usage record to App Insights (lands in the traces table).
+
+    Every record carries `status` (success|failure); failures also carry `reason`.
+    Optional fields are omitted when None so the dashboard only sees real values.
+    """
+    dims = {
+        "bot_env": BOT_ENV,
+        "event_type": "file_processed",
+        "status": status,
+        "user_id": user_id,
+    }
+    optional = {
+        "reason": reason,
+        "language": language,
+        "ocr_pages": ocr_pages,
+        "tts_chars": tts_chars,
+        "file_type": file_type,
+        "file_size_kb": file_size_kb,
+        "duration_ms": duration_ms,
+    }
+    dims.update({k: v for k, v in optional.items() if v is not None})
+    logger.info("UsageMetrics", extra={"custom_dimensions": dims})
+
+
+def classify_file_type(mime_type: str) -> str:
+    if mime_type == "application/pdf":
+        return "pdf"
+    if mime_type and mime_type.startswith("image/"):
+        return "image"
+    return "other"
 
 doc_client = DocumentIntelligenceClient(
     endpoint=DOCUMENT_INTELLIGENCE_ENDPOINT,
@@ -230,23 +250,31 @@ async def ask_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     logger.info(f"User {user_id} sent a file or photo")
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
     file = update.message.document or update.message.photo[-1]
+    mime_type = getattr(file, "mime_type", None)
+    file_size = getattr(file, "file_size", None)
+    file_type = classify_file_type(mime_type if mime_type else "image/jpeg")
+    file_size_kb = round(file_size / 1024) if file_size else None
     logger.info(
         f"File attributes for user {user_id}: "
         f"type={type(file)}, "
         f"file_name={getattr(file,'file_name',None)}, "
-        f"mime_type={getattr(file,'mime_type',None)}, "
-        f"file_size={getattr(file,'file_size',None)}"
+        f"mime_type={mime_type}, "
+        f"file_size={file_size}"
     )
     if not is_supported_file(file):
         await update.message.reply_text(
             "❌ Unsupported file type or file too large. Please send a PDF, JPEG, PNG, TIFF, BMP, or WebP file (max 17MB)."
         )
+        log_usage(user_id, status="failure", reason="unsupported_file",
+                  file_type=file_type, file_size_kb=file_size_kb)
         return ConversationHandler.END
 
     tg_file = await file.get_file()
     file_path = tempfile.mktemp()
     await tg_file.download_to_drive(file_path)
     context.user_data['file_path'] = file_path
+    context.user_data['file_type'] = file_type
+    context.user_data['file_size_kb'] = file_size_kb
 
     reply_markup = ReplyKeyboardMarkup(
         [["1", "2", "3"]],
@@ -286,6 +314,13 @@ async def process_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     lang_info = LANG_OPTIONS[lang_choice]
     lang_code = lang_info["lang_code"]
     voice = lang_info["voice"]
+    file_type = context.user_data.get('file_type')
+    file_size_kb = context.user_data.get('file_size_kb')
+    t0 = time.monotonic()
+    ocr_pages = None
+
+    def elapsed_ms():
+        return round((time.monotonic() - t0) * 1000)
 
     try:
         with open(file_path, "rb") as f:
@@ -305,6 +340,9 @@ async def process_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             await update.message.reply_text("No text found in the document.")
             await prompt_for_file(update)
             await processing_message.delete()
+            log_usage(user_id, status="failure", reason="no_text", language=lang_info["desc"],
+                      ocr_pages=ocr_pages, file_type=file_type, file_size_kb=file_size_kb,
+                      duration_ms=elapsed_ms())
             return ConversationHandler.END
 
         ssml = f"""
@@ -331,6 +369,9 @@ async def process_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             await update.message.reply_text("An internal error occurred during speech synthesis. Please try again later.")
             await prompt_for_file(update)
             await processing_message.delete()
+            log_usage(user_id, status="failure", reason="synthesis_error", language=lang_info["desc"],
+                      ocr_pages=ocr_pages, file_type=file_type, file_size_kb=file_size_kb,
+                      duration_ms=elapsed_ms())
             return ConversationHandler.END
 
         ogg_path = f"{tempfile.mktemp()}.ogg"
@@ -341,13 +382,18 @@ async def process_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await update.message.reply_text("Tip: Tap the 1x badge on the audio to change playback speed.")
         await update.message.reply_text(HELP_MESSAGE)
         logger.info(f"User {user_id} processed a file with language choice {lang_choice}")
-        log_usage(user_id, lang_info["desc"], ocr_pages, len(normalized_text))
+        log_usage(user_id, status="success", language=lang_info["desc"], ocr_pages=ocr_pages,
+                  tts_chars=len(normalized_text), file_type=file_type, file_size_kb=file_size_kb,
+                  duration_ms=elapsed_ms())
 
     except Exception as e:
         logger.error(f"Exception for user {user_id}: {e!r}")
         logger.error(traceback.format_exc())
         await update.message.reply_text("❌ An internal error occurred while processing your request. Please try again later.")
         await prompt_for_file(update)
+        log_usage(user_id, status="failure", reason="exception", language=lang_info["desc"],
+                  ocr_pages=ocr_pages, file_type=file_type, file_size_kb=file_size_kb,
+                  duration_ms=elapsed_ms())
     finally:
         stop_typing.set()
         typing_task.cancel()
