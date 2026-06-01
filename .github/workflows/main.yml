@@ -11,19 +11,8 @@ on:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    outputs:
-      tag: ${{ steps.vars.outputs.tag }}
     steps:
       - uses: actions/checkout@v3
-
-      - name: Set image tag
-        id: vars
-        run: |
-          if [[ "${GITHUB_REF##*/}" == "dev" ]]; then
-            echo "tag=${{ secrets.ACR_LOGIN_SERVER }}/yonchee-bot:dev" >> $GITHUB_OUTPUT
-          elif [[ "${GITHUB_REF##*/}" == "main" ]]; then
-            echo "tag=${{ secrets.ACR_LOGIN_SERVER }}/yonchee-bot:prod" >> $GITHUB_OUTPUT
-          fi
 
       - name: Log in to Azure Container Registry
         uses: docker/login-action@v2
@@ -32,12 +21,21 @@ jobs:
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
-      - name: Build and push Docker image (prod or dev)
+      - name: Build and push Docker image (dev)
+        if: github.ref == 'refs/heads/dev'
         uses: docker/build-push-action@v4
         with:
           context: .
           push: true
-          tags: ${{ steps.vars.outputs.tag }}
+          tags: ${{ secrets.ACR_LOGIN_SERVER }}/yonchee-bot:dev
+
+      - name: Build and push Docker image (prod)
+        if: github.ref == 'refs/heads/main'
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.ACR_LOGIN_SERVER }}/yonchee-bot:prod
 
   deploy-dev:
     if: github.ref == 'refs/heads/dev'
@@ -51,6 +49,20 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      - name: Enable external ingress and get webhook URL (dev)
+        run: |
+          az containerapp ingress enable \
+            --name yonchee-bot-dev \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --type external \
+            --target-port 8000 \
+            --transport http 2>/dev/null || true
+          FQDN=$(az containerapp show \
+            --name yonchee-bot-dev \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --query properties.configuration.ingress.fqdn -o tsv)
+          echo "WEBHOOK_URL=https://${FQDN}" >> $GITHUB_ENV
+
       - name: Set Azure Container App Secrets (dev)
         run: |
           az containerapp secret set \
@@ -61,7 +73,10 @@ jobs:
               azure-form-recognizer-key=${{ secrets.AZURE_FORM_RECOGNIZER_KEY }} \
               azure-speech-api-key=${{ secrets.AZURE_SPEECH_API_KEY }} \
               azure-region=${{ secrets.AZURE_REGION }} \
-              telegram-api-token-dev=${{ secrets.TELEGRAM_API_TOKEN_DEV }}
+              telegram-api-token=${{ secrets.TELEGRAM_API_TOKEN_DEV }} \
+              appinsights-instrumentationkey=${{ secrets.APPINSIGHTS_INSTRUMENTATIONKEY }} \
+              webhook-url=${{ env.WEBHOOK_URL }} \
+              webhook-secret=${{ secrets.WEBHOOK_SECRET_DEV }}
 
       - name: Deploy to Azure Container App (dev)
         run: |
@@ -69,14 +84,26 @@ jobs:
             --name yonchee-bot-dev \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --image ${{ secrets.ACR_LOGIN_SERVER }}/yonchee-bot:dev \
-            --revision-suffix ${{ github.run_number }} \
+            --revision-suffix run-${{ github.run_number }} \
+            --min-replicas 0 \
+            --max-replicas 2 \
             --set-env-vars \
               BOT_ENV=dev \
-              TELEGRAM_API_TOKEN_DEV=secretref:telegram-api-token-dev \
+              WEBHOOK_URL=secretref:webhook-url \
+              WEBHOOK_SECRET=secretref:webhook-secret \
+              TELEGRAM_API_TOKEN=secretref:telegram-api-token \
               AZURE_FORM_RECOGNIZER_ENDPOINT=secretref:azure-form-recognizer-endpoint \
               AZURE_FORM_RECOGNIZER_KEY=secretref:azure-form-recognizer-key \
               AZURE_SPEECH_API_KEY=secretref:azure-speech-api-key \
-              AZURE_REGION=secretref:azure-region
+              AZURE_REGION=secretref:azure-region \
+              APPINSIGHTS_INSTRUMENTATIONKEY=secretref:appinsights-instrumentationkey
+
+      - name: Register Telegram webhook (dev)
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_API_TOKEN_DEV }}/setWebhook" \
+            -d "url=${{ env.WEBHOOK_URL }}/${{ secrets.TELEGRAM_API_TOKEN_DEV }}" \
+            -d "secret_token=${{ secrets.WEBHOOK_SECRET_DEV }}" \
+            | tee /dev/stderr | grep -q '"ok":true'
 
   deploy-prod:
     if: github.ref == 'refs/heads/main'
@@ -90,6 +117,20 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      - name: Enable external ingress and get webhook URL (prod)
+        run: |
+          az containerapp ingress enable \
+            --name yonchee-bot-prod \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --type external \
+            --target-port 8000 \
+            --transport http 2>/dev/null || true
+          FQDN=$(az containerapp show \
+            --name yonchee-bot-prod \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --query properties.configuration.ingress.fqdn -o tsv)
+          echo "WEBHOOK_URL=https://${FQDN}" >> $GITHUB_ENV
+
       - name: Set Azure Container App Secrets (prod)
         run: |
           az containerapp secret set \
@@ -100,7 +141,10 @@ jobs:
               azure-form-recognizer-key=${{ secrets.AZURE_FORM_RECOGNIZER_KEY }} \
               azure-speech-api-key=${{ secrets.AZURE_SPEECH_API_KEY }} \
               azure-region=${{ secrets.AZURE_REGION }} \
-              telegram-api-token-prod=${{ secrets.TELEGRAM_API_TOKEN_PROD }}
+              telegram-api-token=${{ secrets.TELEGRAM_API_TOKEN_PROD }} \
+              appinsights-instrumentationkey=${{ secrets.APPINSIGHTS_INSTRUMENTATIONKEY }} \
+              webhook-url=${{ env.WEBHOOK_URL }} \
+              webhook-secret=${{ secrets.WEBHOOK_SECRET_PROD }}
 
       - name: Deploy to Azure Container App (prod)
         run: |
@@ -108,11 +152,23 @@ jobs:
             --name yonchee-bot-prod \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --image ${{ secrets.ACR_LOGIN_SERVER }}/yonchee-bot:prod \
-            --revision-suffix ${{ github.run_number }} \
+            --revision-suffix run-${{ github.run_number }} \
+            --min-replicas 0 \
+            --max-replicas 2 \
             --set-env-vars \
               BOT_ENV=prod \
-              TELEGRAM_API_TOKEN_PROD=secretref:telegram-api-token-prod \
+              WEBHOOK_URL=secretref:webhook-url \
+              WEBHOOK_SECRET=secretref:webhook-secret \
+              TELEGRAM_API_TOKEN=secretref:telegram-api-token \
               AZURE_FORM_RECOGNIZER_ENDPOINT=secretref:azure-form-recognizer-endpoint \
               AZURE_FORM_RECOGNIZER_KEY=secretref:azure-form-recognizer-key \
               AZURE_SPEECH_API_KEY=secretref:azure-speech-api-key \
-              AZURE_REGION=secretref:azure-region
+              AZURE_REGION=secretref:azure-region \
+              APPINSIGHTS_INSTRUMENTATIONKEY=secretref:appinsights-instrumentationkey
+
+      - name: Register Telegram webhook (prod)
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_API_TOKEN_PROD }}/setWebhook" \
+            -d "url=${{ env.WEBHOOK_URL }}/${{ secrets.TELEGRAM_API_TOKEN_PROD }}" \
+            -d "secret_token=${{ secrets.WEBHOOK_SECRET_PROD }}" \
+            | tee /dev/stderr | grep -q '"ok":true'
