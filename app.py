@@ -8,6 +8,7 @@ import sys
 import platform
 import time
 import html
+from collections import defaultdict
 from dotenv import load_dotenv
 
 try:
@@ -15,12 +16,13 @@ try:
 except ImportError:
     AzureLogHandler = None
 
-from telegram import Update, ReplyKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes,
-    filters, ConversationHandler
+    ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler,
+    ContextTypes, filters
 )
 from azure.ai.documentintelligence import DocumentIntelligenceClient
+from azure.ai.documentintelligence.models import DocumentAnalysisFeature
 from azure.core.credentials import AzureKeyCredential
 from azure.cognitiveservices.speech import (
     SpeechConfig, SpeechSynthesizer, AudioConfig, ResultReason, CancellationReason
@@ -111,6 +113,11 @@ MESSAGES = {
         "synthesis_error": "An internal error occurred during speech synthesis. Please try again later.",
         "playback_tip": "Tip: Tap the 1x badge on the audio to change playback speed.",
         "generic_error": "❌ An internal error occurred while processing your request. Please try again later.",
+        "analyzing": "🔎 Reading the document…",
+        "detected_lang": "🔎 Detected language: {lang}.",
+        "generating_audio": "⏳ Generating audio…",
+        "choose_language": "🔊 Which language is the text in? Choose below:",
+        "detected_choice": "✅ {lang} — detected",
     },
     "ru": {
         "welcome": "👋 Добро пожаловать в бот Yonchee Text2Speech!",
@@ -134,6 +141,11 @@ MESSAGES = {
         "synthesis_error": "Произошла внутренняя ошибка при синтезе речи. Попробуйте позже.",
         "playback_tip": "Подсказка: нажмите на значок 1x у аудио, чтобы изменить скорость воспроизведения.",
         "generic_error": "❌ Произошла внутренняя ошибка при обработке запроса. Попробуйте позже.",
+        "analyzing": "🔎 Читаю документ…",
+        "detected_lang": "🔎 Определил язык: {lang}.",
+        "generating_audio": "⏳ Генерирую аудио…",
+        "choose_language": "🔊 На каком языке текст? Выберите ниже:",
+        "detected_choice": "✅ {lang} — определён",
     },
     "uk": {
         "welcome": "👋 Ласкаво просимо до бота Yonchee Text2Speech!",
@@ -157,6 +169,11 @@ MESSAGES = {
         "synthesis_error": "Сталася внутрішня помилка під час синтезу мовлення. Спробуйте пізніше.",
         "playback_tip": "Підказка: натисніть на позначку 1x на аудіо, щоб змінити швидкість відтворення.",
         "generic_error": "❌ Сталася внутрішня помилка під час обробки запиту. Спробуйте пізніше.",
+        "analyzing": "🔎 Читаю документ…",
+        "detected_lang": "🔎 Визначив мову: {lang}.",
+        "generating_audio": "⏳ Генерую аудіо…",
+        "choose_language": "🔊 Якою мовою текст? Оберіть нижче:",
+        "detected_choice": "✅ {lang} — визначено",
     },
     "es": {
         "welcome": "👋 ¡Bienvenido al bot Yonchee Text2Speech!",
@@ -180,6 +197,11 @@ MESSAGES = {
         "synthesis_error": "Ocurrió un error interno durante la síntesis de voz. Inténtalo de nuevo más tarde.",
         "playback_tip": "Consejo: toca la insignia 1x del audio para cambiar la velocidad de reproducción.",
         "generic_error": "❌ Ocurrió un error interno al procesar tu solicitud. Inténtalo de nuevo más tarde.",
+        "analyzing": "🔎 Leyendo el documento…",
+        "detected_lang": "🔎 Idioma detectado: {lang}.",
+        "generating_audio": "⏳ Generando el audio…",
+        "choose_language": "🔊 ¿En qué idioma está el texto? Elige abajo:",
+        "detected_choice": "✅ {lang} — detectado",
     },
     "de": {
         "welcome": "👋 Willkommen beim Yonchee Text2Speech-Bot!",
@@ -203,6 +225,11 @@ MESSAGES = {
         "synthesis_error": "Bei der Sprachsynthese ist ein interner Fehler aufgetreten. Bitte versuche es später erneut.",
         "playback_tip": "Tipp: Tippe auf das 1x-Symbol am Audio, um die Wiedergabegeschwindigkeit zu ändern.",
         "generic_error": "❌ Bei der Verarbeitung deiner Anfrage ist ein interner Fehler aufgetreten. Bitte versuche es später erneut.",
+        "analyzing": "🔎 Dokument wird gelesen…",
+        "detected_lang": "🔎 Erkannte Sprache: {lang}.",
+        "generating_audio": "⏳ Audio wird erstellt…",
+        "choose_language": "🔊 In welcher Sprache ist der Text? Bitte unten wählen:",
+        "detected_choice": "✅ {lang} — erkannt",
     },
     "fr": {
         "welcome": "👋 Bienvenue sur le bot Yonchee Text2Speech !",
@@ -226,6 +253,11 @@ MESSAGES = {
         "synthesis_error": "Une erreur interne s'est produite lors de la synthèse vocale. Réessaie plus tard.",
         "playback_tip": "Astuce : appuie sur le badge 1x de l'audio pour changer la vitesse de lecture.",
         "generic_error": "❌ Une erreur interne s'est produite lors du traitement de ta demande. Réessaie plus tard.",
+        "analyzing": "🔎 Lecture du document…",
+        "detected_lang": "🔎 Langue détectée : {lang}.",
+        "generating_audio": "⏳ Génération de l'audio…",
+        "choose_language": "🔊 Dans quelle langue est le texte ? Choisis ci-dessous :",
+        "detected_choice": "✅ {lang} — détectée",
     },
     "pl": {
         "welcome": "👋 Witaj w bocie Yonchee Text2Speech!",
@@ -249,6 +281,11 @@ MESSAGES = {
         "synthesis_error": "Wystąpił wewnętrzny błąd podczas syntezy mowy. Spróbuj ponownie później.",
         "playback_tip": "Wskazówka: dotknij oznaczenia 1x przy audio, aby zmienić prędkość odtwarzania.",
         "generic_error": "❌ Wystąpił wewnętrzny błąd podczas przetwarzania żądania. Spróbuj ponownie później.",
+        "analyzing": "🔎 Odczytuję dokument…",
+        "detected_lang": "🔎 Wykryty język: {lang}.",
+        "generating_audio": "⏳ Generuję audio…",
+        "choose_language": "🔊 W jakim języku jest tekst? Wybierz poniżej:",
+        "detected_choice": "✅ {lang} — wykryto",
     },
     "pt": {
         "welcome": "👋 Bem-vindo ao bot Yonchee Text2Speech!",
@@ -272,6 +309,11 @@ MESSAGES = {
         "synthesis_error": "Ocorreu um erro interno durante a síntese de voz. Tente novamente mais tarde.",
         "playback_tip": "Dica: toque no selo 1x do áudio para alterar a velocidade de reprodução.",
         "generic_error": "❌ Ocorreu um erro interno ao processar sua solicitação. Tente novamente mais tarde.",
+        "analyzing": "🔎 Lendo o documento…",
+        "detected_lang": "🔎 Idioma detectado: {lang}.",
+        "generating_audio": "⏳ Gerando o áudio…",
+        "choose_language": "🔊 Em que idioma está o texto? Escolha abaixo:",
+        "detected_choice": "✅ {lang} — detectado",
     },
 }
 DEFAULT_UI_LANG = "en"
@@ -342,12 +384,78 @@ doc_client = DocumentIntelligenceClient(
 )
 speech_config = SpeechConfig(subscription=SPEECH_API_KEY, region=SPEECH_REGION)
 
-LANG_OPTIONS = {
-    "1": {"lang_code": "uk-UA", "voice": "uk-UA-PolinaNeural", "desc": "Ukrainian"},
-    "2": {"lang_code": "ru-RU", "voice": "ru-RU-DmitryNeural", "desc": "Russian"},
-    "3": {"lang_code": "en-US", "voice": "en-US-AriaNeural", "desc": "English"},
+# Detected OCR locale (2-letter) -> Azure Neural TTS voice + display name/flag.
+# Drives both auto-pick (from OCR language detection) and the manual picker.
+VOICE_MAP = {
+    # Curated target-market languages (also shown as menu buttons):
+    "en": {"lang_code": "en-US", "voice": "en-US-AriaNeural",      "name": "English",    "flag": "🇬🇧"},
+    "uk": {"lang_code": "uk-UA", "voice": "uk-UA-PolinaNeural",    "name": "Українська", "flag": "🇺🇦"},
+    "ru": {"lang_code": "ru-RU", "voice": "ru-RU-DmitryNeural",    "name": "Русский",    "flag": "🇷🇺"},
+    "es": {"lang_code": "es-ES", "voice": "es-ES-ElviraNeural",    "name": "Español",    "flag": "🇪🇸"},
+    "de": {"lang_code": "de-DE", "voice": "de-DE-KatjaNeural",     "name": "Deutsch",    "flag": "🇩🇪"},
+    "fr": {"lang_code": "fr-FR", "voice": "fr-FR-DeniseNeural",    "name": "Français",   "flag": "🇫🇷"},
+    "pl": {"lang_code": "pl-PL", "voice": "pl-PL-AgnieszkaNeural", "name": "Polski",     "flag": "🇵🇱"},
+    "pt": {"lang_code": "pt-PT", "voice": "pt-PT-RaquelNeural",    "name": "Português",  "flag": "🇵🇹"},
+    "it": {"lang_code": "it-IT", "voice": "it-IT-ElsaNeural",      "name": "Italiano",   "flag": "🇮🇹"},
+    "nl": {"lang_code": "nl-NL", "voice": "nl-NL-ColetteNeural",   "name": "Nederlands", "flag": "🇳🇱"},
+    "tr": {"lang_code": "tr-TR", "voice": "tr-TR-EmelNeural",      "name": "Türkçe",     "flag": "🇹🇷"},
+    "kk": {"lang_code": "kk-KZ", "voice": "kk-KZ-AigulNeural",     "name": "Қазақша",    "flag": "🇰🇿"},
+    # Extra languages reachable via auto-detect (not shown in the manual menu):
+    "ar": {"lang_code": "ar-EG", "voice": "ar-EG-SalmaNeural",     "name": "العربية",    "flag": "🇪🇬"},
+    "cs": {"lang_code": "cs-CZ", "voice": "cs-CZ-VlastaNeural",    "name": "Čeština",    "flag": "🇨🇿"},
+    "da": {"lang_code": "da-DK", "voice": "da-DK-ChristelNeural",  "name": "Dansk",      "flag": "🇩🇰"},
+    "el": {"lang_code": "el-GR", "voice": "el-GR-AthinaNeural",    "name": "Ελληνικά",   "flag": "🇬🇷"},
+    "fi": {"lang_code": "fi-FI", "voice": "fi-FI-SelmaNeural",     "name": "Suomi",      "flag": "🇫🇮"},
+    "he": {"lang_code": "he-IL", "voice": "he-IL-HilaNeural",      "name": "עברית",      "flag": "🇮🇱"},
+    "hi": {"lang_code": "hi-IN", "voice": "hi-IN-SwaraNeural",     "name": "हिन्दी",      "flag": "🇮🇳"},
+    "hu": {"lang_code": "hu-HU", "voice": "hu-HU-NoemiNeural",     "name": "Magyar",     "flag": "🇭🇺"},
+    "id": {"lang_code": "id-ID", "voice": "id-ID-GadisNeural",     "name": "Indonesia",  "flag": "🇮🇩"},
+    "ja": {"lang_code": "ja-JP", "voice": "ja-JP-NanamiNeural",    "name": "日本語",      "flag": "🇯🇵"},
+    "ko": {"lang_code": "ko-KR", "voice": "ko-KR-SunHiNeural",     "name": "한국어",      "flag": "🇰🇷"},
+    "ro": {"lang_code": "ro-RO", "voice": "ro-RO-AlinaNeural",     "name": "Română",     "flag": "🇷🇴"},
+    "sv": {"lang_code": "sv-SE", "voice": "sv-SE-SofieNeural",     "name": "Svenska",    "flag": "🇸🇪"},
+    "th": {"lang_code": "th-TH", "voice": "th-TH-PremwadeeNeural", "name": "ไทย",        "flag": "🇹🇭"},
+    "vi": {"lang_code": "vi-VN", "voice": "vi-VN-HoaiMyNeural",    "name": "Tiếng Việt", "flag": "🇻🇳"},
+    "zh": {"lang_code": "zh-CN", "voice": "zh-CN-XiaoxiaoNeural",  "name": "中文",        "flag": "🇨🇳"},
 }
-LANG_CHOICE = 0
+
+# Languages shown as buttons in the manual picker (target markets). Auto-detect
+# can still pick any language in VOICE_MAP beyond this list.
+MENU_LANGS = ["en", "uk", "ru", "es", "de", "fr", "pl", "pt", "it", "nl", "tr", "kk"]
+
+# Auto-proceed to synthesis only when detection is at least this confident and
+# the dominant language covers at least this fraction of the text; else we ask.
+AUTO_DETECT_MIN_CONFIDENCE = 0.6
+AUTO_DETECT_MIN_COVERAGE = 0.6
+
+
+def detect_dominant_language(result):
+    """Aggregate AnalyzeResult.languages into a single dominant language.
+
+    Returns (locale2, confidence, coverage):
+    - locale2: 2-letter code (e.g. 'fr') or None if detection is unavailable
+    - confidence: text-length-weighted mean confidence for that language
+    - coverage: fraction of detected text that is in that language
+    """
+    langs = getattr(result, "languages", None) or []
+    weighted_conf = defaultdict(float)
+    length = defaultdict(float)
+    total = 0.0
+    for lang in langs:
+        locale2 = ((lang.locale or "")[:2]).lower()
+        if not locale2:
+            continue
+        span_len = float(sum((s.length or 0) for s in (lang.spans or []))) or 1.0
+        conf = float(lang.confidence or 0.0)
+        weighted_conf[locale2] += span_len * conf
+        length[locale2] += span_len
+        total += span_len
+    if not length or total <= 0:
+        return None, 0.0, 0.0
+    best = max(length, key=lambda k: length[k])
+    confidence = weighted_conf[best] / length[best] if length[best] else 0.0
+    coverage = length[best] / total
+    return best, confidence, coverage
 
 SUPPORTED_MIME = {
     "image/jpeg", "image/png", "image/tiff", "image/bmp",
@@ -436,9 +544,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     logger.info(f"User {user_id} requested help")
     await update.message.reply_text(t(update, "help"))
 
-async def prompt_for_file(update: Update) -> None:
-    await update.message.reply_text(t(update, "help"))
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
     lang_code = update.effective_user.language_code[:2] if update.effective_user.language_code else "Unknown"
@@ -447,10 +552,36 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         f"{t(update, 'welcome')}\n{t(update, 'help')}"
     )
 
-async def ask_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+def build_language_keyboard(update: Update, detected_locale) -> InlineKeyboardMarkup:
+    """Inline keyboard: detected language pinned first (if recognized), then the
+    curated target-market languages, 2 per row. No typing required — built for
+    screen-reader users who navigate by tapping buttons."""
+    rows = []
+    if detected_locale in VOICE_MAP:
+        info = VOICE_MAP[detected_locale]
+        rows.append([InlineKeyboardButton(
+            t(update, "detected_choice").format(lang=f'{info["flag"]} {info["name"]}'),
+            callback_data=f"lang:{detected_locale}")])
+    row = []
+    for code in MENU_LANGS:
+        if code == detected_locale:
+            continue
+        info = VOICE_MAP[code]
+        row.append(InlineKeyboardButton(f'{info["flag"]} {info["name"]}', callback_data=f"lang:{code}"))
+        if len(row) == 2:
+            rows.append(row)
+            row = []
+    if row:
+        rows.append(row)
+    return InlineKeyboardMarkup(rows)
+
+
+async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Entry point: download → OCR (with language detection) → auto-synthesize if
+    the language is confidently detected, otherwise show the language picker."""
     user_id = update.effective_user.id
+    chat_id = update.effective_chat.id
     logger.info(f"User {user_id} sent a file or photo")
-    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
     file = update.message.document or update.message.photo[-1]
     mime_type = getattr(file, "mime_type", None)
     file_size = getattr(file, "file_size", None)
@@ -467,78 +598,121 @@ async def ask_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         await update.message.reply_text(t(update, "unsupported_file"))
         log_usage(user_id, status="failure", reason="unsupported_file",
                   file_type=file_type, file_size_kb=file_size_kb)
-        return ConversationHandler.END
+        return
 
-    tg_file = await file.get_file()
-    file_path = tempfile.mktemp()
-    await tg_file.download_to_drive(file_path)
-    context.user_data['file_path'] = file_path
-    context.user_data['file_type'] = file_type
-    context.user_data['file_size_kb'] = file_size_kb
-
-    reply_markup = ReplyKeyboardMarkup(
-        [["1", "2", "3"]],
-        one_time_keyboard=True,
-        resize_keyboard=True,
-        input_field_placeholder=t(update, "lang_placeholder")
-    )
-    await update.message.reply_text(
-        t(update, "ask_language"),
-        reply_markup=reply_markup
-    )
-    return LANG_CHOICE
-
-async def process_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    user_id = update.effective_user.id
-    lang_choice = update.message.text.strip()
-    file_path = context.user_data.get('file_path')
-    audio_path = None
-    ogg_path = None
-
-    if lang_choice not in LANG_OPTIONS:
-        logger.info(f"User {user_id} made invalid language choice: {lang_choice}")
-        await update.message.reply_text(t(update, "invalid_choice"))
-        return LANG_CHOICE
-
-    processing_message = await update.message.reply_text(t(update, "processing"))
-
+    status_message = await update.message.reply_text(t(update, "analyzing"))
     stop_typing = asyncio.Event()
-    typing_task = asyncio.create_task(_keep_typing(context.bot, update.effective_chat.id, stop_typing))
-
-    lang_info = LANG_OPTIONS[lang_choice]
-    lang_code = lang_info["lang_code"]
-    voice = lang_info["voice"]
-    file_type = context.user_data.get('file_type')
-    file_size_kb = context.user_data.get('file_size_kb')
+    typing_task = asyncio.create_task(_keep_typing(context.bot, chat_id, stop_typing))
+    file_path = None
     t0 = time.monotonic()
-    ocr_pages = None
-
-    def elapsed_ms():
-        return round((time.monotonic() - t0) * 1000)
-
     try:
+        tg_file = await file.get_file()
+        file_path = tempfile.mktemp()
+        await tg_file.download_to_drive(file_path)
         with open(file_path, "rb") as f:
-            poller = doc_client.begin_analyze_document("prebuilt-read", f)
+            poller = doc_client.begin_analyze_document(
+                "prebuilt-read", f, features=[DocumentAnalysisFeature.LANGUAGES]
+            )
             result = poller.result()
-            ocr_pages = len(result.pages)
-            extracted_text = ""
-            for page in result.pages:
-                for line in page.lines:
-                    extracted_text += line.content + "\n"
-
+        ocr_pages = len(result.pages)
+        extracted_text = ""
+        for page in result.pages:
+            for line in page.lines:
+                extracted_text += line.content + "\n"
         normalized_text = normalize_ocr_text(extracted_text)
-        escaped_text = escape_ssml(normalized_text)
+        ocr_ms = round((time.monotonic() - t0) * 1000)
 
         if not normalized_text.strip():
             logger.info(f"User {user_id} uploaded a file with no detectable text")
-            await update.message.reply_text(t(update, "no_text"))
-            await prompt_for_file(update)
-            await processing_message.delete()
-            log_usage(user_id, status="failure", reason="no_text", language=lang_info["desc"],
-                      ocr_pages=ocr_pages, file_type=file_type, file_size_kb=file_size_kb,
-                      duration_ms=elapsed_ms())
-            return ConversationHandler.END
+            await status_message.edit_text(t(update, "no_text"))
+            await update.message.reply_text(t(update, "help"))
+            log_usage(user_id, status="failure", reason="no_text", ocr_pages=ocr_pages,
+                      file_type=file_type, file_size_kb=file_size_kb, duration_ms=ocr_ms)
+            return
 
+        locale2, conf, coverage = detect_dominant_language(result)
+        logger.info(f"User {user_id}: detected lang={locale2} conf={conf:.2f} coverage={coverage:.2f}")
+        context.user_data["ocr_job"] = {
+            "text": normalized_text, "ocr_pages": ocr_pages, "ocr_ms": ocr_ms,
+            "file_type": file_type, "file_size_kb": file_size_kb,
+        }
+
+        if (locale2 in VOICE_MAP and conf >= AUTO_DETECT_MIN_CONFIDENCE
+                and coverage >= AUTO_DETECT_MIN_COVERAGE):
+            info = VOICE_MAP[locale2]
+            await status_message.edit_text(
+                t(update, "detected_lang").format(lang=f'{info["flag"]} {info["name"]}')
+            )
+            stop_typing.set()
+            await synthesize_and_send(update, context, locale2, status_message=None)
+        else:
+            await status_message.edit_text(
+                t(update, "choose_language"),
+                reply_markup=build_language_keyboard(update, locale2)
+            )
+    except Exception as e:
+        logger.error(f"OCR/handle exception for user {user_id}: {e!r}")
+        logger.error(traceback.format_exc())
+        try:
+            await status_message.edit_text(t(update, "generic_error"))
+        except Exception:
+            await update.message.reply_text(t(update, "generic_error"))
+        await update.message.reply_text(t(update, "help"))
+        log_usage(user_id, status="failure", reason="ocr_exception",
+                  file_type=file_type, file_size_kb=file_size_kb,
+                  duration_ms=round((time.monotonic() - t0) * 1000))
+    finally:
+        stop_typing.set()
+        typing_task.cancel()
+        try:
+            await typing_task
+        except asyncio.CancelledError:
+            pass
+        remove_temp_file(file_path)
+
+async def synthesize_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE,
+                              locale2: str, status_message=None) -> None:
+    """Synthesize the stored OCR text into a voice message in the chosen language.
+    Shared by the auto-detect path and the manual inline-picker callback."""
+    user_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+    job = context.user_data.get("ocr_job")
+    if not job:
+        # Stale callback (e.g. after a scale-to-zero restart) — nothing to synthesize.
+        await context.bot.send_message(chat_id, t(update, "help"))
+        return
+
+    info = VOICE_MAP.get(locale2) or VOICE_MAP["en"]
+    lang_code = info["lang_code"]
+    voice = info["voice"]
+    lang_label = f'{info["flag"]} {info["name"]}'
+    normalized_text = job["text"]
+    ocr_pages = job.get("ocr_pages")
+    ocr_ms = job.get("ocr_ms", 0)
+    file_type = job.get("file_type")
+    file_size_kb = job.get("file_size_kb")
+
+    audio_path = None
+    ogg_path = None
+    t0 = time.monotonic()
+    stop_typing = asyncio.Event()
+    typing_task = asyncio.create_task(_keep_typing(context.bot, chat_id, stop_typing))
+
+    def elapsed_ms():
+        return ocr_ms + round((time.monotonic() - t0) * 1000)
+
+    try:
+        if status_message is not None:
+            try:
+                await status_message.edit_text(t(update, "generating_audio").format(lang=lang_label))
+            except Exception:
+                status_message = None
+        if status_message is None:
+            status_message = await context.bot.send_message(
+                chat_id, t(update, "generating_audio").format(lang=lang_label)
+            )
+
+        escaped_text = escape_ssml(normalized_text)
         ssml = f"""
 <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="{lang_code}">
   <voice name="{voice}">
@@ -560,32 +734,31 @@ async def process_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                 if cancellation_details.reason == CancellationReason.Error:
                     error_message += f" Error details: {cancellation_details.error_details}"
             logger.error(f"Speech synthesis error for user {user_id}: {error_message}")
-            await update.message.reply_text(t(update, "synthesis_error"))
-            await prompt_for_file(update)
-            await processing_message.delete()
-            log_usage(user_id, status="failure", reason="synthesis_error", language=lang_info["desc"],
+            await context.bot.send_message(chat_id, t(update, "synthesis_error"))
+            await context.bot.send_message(chat_id, t(update, "help"))
+            log_usage(user_id, status="failure", reason="synthesis_error", language=info["name"],
                       ocr_pages=ocr_pages, file_type=file_type, file_size_kb=file_size_kb,
                       duration_ms=elapsed_ms())
-            return ConversationHandler.END
+            return
 
         ogg_path = f"{tempfile.mktemp()}.ogg"
         convert_mp3_to_ogg(audio_path, ogg_path)
 
         with open(ogg_path, "rb") as voice_file:
-            await update.message.reply_voice(voice_file)
-        await update.message.reply_text(t(update, "playback_tip"))
-        await update.message.reply_text(t(update, "help"))
-        logger.info(f"User {user_id} processed a file with language choice {lang_choice}")
-        log_usage(user_id, status="success", language=lang_info["desc"], ocr_pages=ocr_pages,
+            await context.bot.send_voice(chat_id=chat_id, voice=voice_file)
+        await context.bot.send_message(chat_id, t(update, "playback_tip"))
+        await context.bot.send_message(chat_id, t(update, "help"))
+        logger.info(f"User {user_id} processed a file in language {locale2}")
+        log_usage(user_id, status="success", language=info["name"], ocr_pages=ocr_pages,
                   tts_chars=len(normalized_text), file_type=file_type, file_size_kb=file_size_kb,
                   duration_ms=elapsed_ms())
 
     except Exception as e:
         logger.error(f"Exception for user {user_id}: {e!r}")
         logger.error(traceback.format_exc())
-        await update.message.reply_text(t(update, "generic_error"))
-        await prompt_for_file(update)
-        log_usage(user_id, status="failure", reason="exception", language=lang_info["desc"],
+        await context.bot.send_message(chat_id, t(update, "generic_error"))
+        await context.bot.send_message(chat_id, t(update, "help"))
+        log_usage(user_id, status="failure", reason="exception", language=info["name"],
                   ocr_pages=ocr_pages, file_type=file_type, file_size_kb=file_size_kb,
                   duration_ms=elapsed_ms())
     finally:
@@ -596,12 +769,23 @@ async def process_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         except asyncio.CancelledError:
             pass
         try:
-            await processing_message.delete()
+            if status_message is not None:
+                await status_message.delete()
         except Exception:
             pass
-        for path in [file_path, audio_path, ogg_path]:
+        for path in [audio_path, ogg_path]:
             remove_temp_file(path)
-    return ConversationHandler.END
+        context.user_data.pop("ocr_job", None)
+
+
+async def on_language_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+    data = query.data or ""
+    if not data.startswith("lang:"):
+        return
+    locale2 = data.split(":", 1)[1]
+    await synthesize_and_send(update, context, locale2, status_message=query.message)
 
 # --- Main entrypoint ---
 def main() -> None:
@@ -615,15 +799,8 @@ def main() -> None:
     )
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
-
-    conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Document.ALL | filters.PHOTO, ask_language)],
-        states={
-            LANG_CHOICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, process_language)],
-        },
-        fallbacks=[],
-    )
-    app.add_handler(conv_handler)
+    app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO, handle_file))
+    app.add_handler(CallbackQueryHandler(on_language_callback, pattern=r"^lang:"))
 
     if WEBHOOK_URL:
         logger.info(f"Starting in webhook mode, port 8000")
