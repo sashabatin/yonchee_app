@@ -456,6 +456,7 @@ speech_config = SpeechConfig(subscription=SPEECH_API_KEY, region=SPEECH_REGION)
 # connection string is configured (local dev) — the bot still works, just without
 # cross-restart memory.
 USER_TABLE_NAME = "users"
+STORE_PARTITION = BOT_ENV or "user"  # isolate dev/prod data within one shared table
 MAX_RECENT_LANGS = 3
 
 
@@ -491,7 +492,7 @@ class _TableStore:
     def get_user(self, user_id):
         from azure.core.exceptions import ResourceNotFoundError
         try:
-            e = self._client.get_entity("user", str(user_id))
+            e = self._client.get_entity(STORE_PARTITION, str(user_id))
             return {"default_lang": e.get("default_lang") or "", "recent": e.get("recent") or ""}
         except ResourceNotFoundError:
             return {}
@@ -500,7 +501,7 @@ class _TableStore:
             return {}
 
     def _upsert(self, user_id, **fields):
-        entity = {"PartitionKey": "user", "RowKey": str(user_id)}
+        entity = {"PartitionKey": STORE_PARTITION, "RowKey": str(user_id)}
         entity.update(fields)
         try:
             self._client.upsert_entity(entity)  # default mode merges fields
