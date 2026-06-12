@@ -118,6 +118,11 @@ MESSAGES = {
         "generating_audio": "⏳ Generating audio…",
         "choose_language": "🔊 Which language is the text in? Choose below:",
         "detected_choice": "✅ {lang} — detected",
+        "using_default": "🗣 Using your saved language: {lang}.",
+        "language_menu": "🌐 Choose a default language for audio. I'll always use it. Pick “Auto-detect” to go back to automatic.",
+        "auto_button": "🔄 Auto-detect",
+        "default_set": "✅ Default language set: {lang}.",
+        "default_auto": "✅ Auto-detect enabled — I'll detect each document's language.",
     },
     "ru": {
         "welcome": "👋 Добро пожаловать в бот Yonchee Text2Speech!",
@@ -146,6 +151,11 @@ MESSAGES = {
         "generating_audio": "⏳ Генерирую аудио…",
         "choose_language": "🔊 На каком языке текст? Выберите ниже:",
         "detected_choice": "✅ {lang} — определён",
+        "using_default": "🗣 Использую сохранённый язык: {lang}.",
+        "language_menu": "🌐 Выберите язык озвучки по умолчанию. Я всегда буду его использовать. «Авто-определение» — вернуться к автоматическому выбору.",
+        "auto_button": "🔄 Авто-определение",
+        "default_set": "✅ Язык по умолчанию установлен: {lang}.",
+        "default_auto": "✅ Включено авто-определение — буду определять язык каждого документа.",
     },
     "uk": {
         "welcome": "👋 Ласкаво просимо до бота Yonchee Text2Speech!",
@@ -174,6 +184,11 @@ MESSAGES = {
         "generating_audio": "⏳ Генерую аудіо…",
         "choose_language": "🔊 Якою мовою текст? Оберіть нижче:",
         "detected_choice": "✅ {lang} — визначено",
+        "using_default": "🗣 Використовую збережену мову: {lang}.",
+        "language_menu": "🌐 Оберіть мову озвучення за замовчуванням. Я завжди її використовуватиму. «Авто-визначення» — повернутися до автоматичного вибору.",
+        "auto_button": "🔄 Авто-визначення",
+        "default_set": "✅ Мову за замовчуванням встановлено: {lang}.",
+        "default_auto": "✅ Увімкнено авто-визначення — визначатиму мову кожного документа.",
     },
     "es": {
         "welcome": "👋 ¡Bienvenido al bot Yonchee Text2Speech!",
@@ -202,6 +217,11 @@ MESSAGES = {
         "generating_audio": "⏳ Generando el audio…",
         "choose_language": "🔊 ¿En qué idioma está el texto? Elige abajo:",
         "detected_choice": "✅ {lang} — detectado",
+        "using_default": "🗣 Usando tu idioma guardado: {lang}.",
+        "language_menu": "🌐 Elige un idioma predeterminado para el audio. Lo usaré siempre. Elige «Detección automática» para volver al modo automático.",
+        "auto_button": "🔄 Detección automática",
+        "default_set": "✅ Idioma predeterminado establecido: {lang}.",
+        "default_auto": "✅ Detección automática activada: detectaré el idioma de cada documento.",
     },
     "de": {
         "welcome": "👋 Willkommen beim Yonchee Text2Speech-Bot!",
@@ -230,6 +250,11 @@ MESSAGES = {
         "generating_audio": "⏳ Audio wird erstellt…",
         "choose_language": "🔊 In welcher Sprache ist der Text? Bitte unten wählen:",
         "detected_choice": "✅ {lang} — erkannt",
+        "using_default": "🗣 Ich verwende deine gespeicherte Sprache: {lang}.",
+        "language_menu": "🌐 Wähle eine Standardsprache für die Audioausgabe. Ich verwende sie immer. Wähle „Automatisch erkennen“, um zur Automatik zurückzukehren.",
+        "auto_button": "🔄 Automatisch erkennen",
+        "default_set": "✅ Standardsprache festgelegt: {lang}.",
+        "default_auto": "✅ Automatische Erkennung aktiviert – ich erkenne die Sprache jedes Dokuments.",
     },
     "fr": {
         "welcome": "👋 Bienvenue sur le bot Yonchee Text2Speech !",
@@ -258,6 +283,11 @@ MESSAGES = {
         "generating_audio": "⏳ Génération de l'audio…",
         "choose_language": "🔊 Dans quelle langue est le texte ? Choisis ci-dessous :",
         "detected_choice": "✅ {lang} — détectée",
+        "using_default": "🗣 J'utilise ta langue enregistrée : {lang}.",
+        "language_menu": "🌐 Choisis une langue par défaut pour l'audio. Je l'utiliserai toujours. Choisis « Détection automatique » pour revenir au mode automatique.",
+        "auto_button": "🔄 Détection automatique",
+        "default_set": "✅ Langue par défaut définie : {lang}.",
+        "default_auto": "✅ Détection automatique activée — je détecterai la langue de chaque document.",
     },
     "pl": {
         "welcome": "👋 Witaj w bocie Yonchee Text2Speech!",
@@ -286,6 +316,11 @@ MESSAGES = {
         "generating_audio": "⏳ Generuję audio…",
         "choose_language": "🔊 W jakim języku jest tekst? Wybierz poniżej:",
         "detected_choice": "✅ {lang} — wykryto",
+        "using_default": "🗣 Używam zapisanego języka: {lang}.",
+        "language_menu": "🌐 Wybierz domyślny język audio. Zawsze będę go używać. Wybierz „Wykrywanie automatyczne”, aby wrócić do trybu automatycznego.",
+        "auto_button": "🔄 Wykrywanie automatyczne",
+        "default_set": "✅ Ustawiono domyślny język: {lang}.",
+        "default_auto": "✅ Włączono automatyczne wykrywanie — wykryję język każdego dokumentu.",
     },
     "pt": {
         "welcome": "👋 Bem-vindo ao bot Yonchee Text2Speech!",
@@ -314,6 +349,11 @@ MESSAGES = {
         "generating_audio": "⏳ Gerando o áudio…",
         "choose_language": "🔊 Em que idioma está o texto? Escolha abaixo:",
         "detected_choice": "✅ {lang} — detectado",
+        "using_default": "🗣 Usando o seu idioma salvo: {lang}.",
+        "language_menu": "🌐 Escolha um idioma padrão para o áudio. Vou usá-lo sempre. Escolha «Detecção automática» para voltar ao modo automático.",
+        "auto_button": "🔄 Detecção automática",
+        "default_set": "✅ Idioma padrão definido: {lang}.",
+        "default_auto": "✅ Detecção automática ativada — vou detectar o idioma de cada documento.",
     },
 }
 DEFAULT_UI_LANG = "en"
@@ -342,6 +382,7 @@ TELEGRAM_API_TOKEN = os.environ["TELEGRAM_API_TOKEN"]
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL", "").rstrip("/")
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
 BOT_ENV = os.environ.get("BOT_ENV", "local")
+AZURE_STORAGE_CONNECTION_STRING = os.environ.get("AZURE_STORAGE_CONNECTION_STRING", "")
 
 
 def log_usage(user_id: int, status: str, reason: str = None, language: str = None,
@@ -383,6 +424,89 @@ doc_client = DocumentIntelligenceClient(
     credential=AzureKeyCredential(DOCUMENT_INTELLIGENCE_KEY)
 )
 speech_config = SpeechConfig(subscription=SPEECH_API_KEY, region=SPEECH_REGION)
+
+
+# --- User preference store (Azure Table Storage, with in-memory fallback) ---
+# Persists each user's pinned default language and recently-used languages so the
+# bot can skip the menu on repeat use. Falls back to an in-memory dict when no
+# connection string is configured (local dev) — the bot still works, just without
+# cross-restart memory.
+USER_TABLE_NAME = "users"
+MAX_RECENT_LANGS = 3
+
+
+class _MemoryStore:
+    def __init__(self):
+        self._d = {}
+
+    def get_user(self, user_id):
+        return dict(self._d.get(user_id, {}))
+
+    def set_default_lang(self, user_id, locale2):
+        u = self._d.setdefault(user_id, {})
+        if locale2:
+            u["default_lang"] = locale2
+        else:
+            u.pop("default_lang", None)
+
+    def add_recent_lang(self, user_id, locale2):
+        u = self._d.setdefault(user_id, {})
+        recent = [x for x in u.get("recent", "").split(",") if x]
+        recent = [locale2] + [x for x in recent if x != locale2]
+        u["recent"] = ",".join(recent[:MAX_RECENT_LANGS])
+
+
+class _TableStore:
+    """One entity per user: PartitionKey='user', RowKey=str(user_id)."""
+    def __init__(self, connection_string):
+        from azure.data.tables import TableServiceClient
+        svc = TableServiceClient.from_connection_string(connection_string)
+        svc.create_table_if_not_exists(USER_TABLE_NAME)
+        self._client = svc.get_table_client(USER_TABLE_NAME)
+
+    def get_user(self, user_id):
+        from azure.core.exceptions import ResourceNotFoundError
+        try:
+            e = self._client.get_entity("user", str(user_id))
+            return {"default_lang": e.get("default_lang") or "", "recent": e.get("recent") or ""}
+        except ResourceNotFoundError:
+            return {}
+        except Exception as ex:
+            logger.warning(f"user_store.get_user failed: {ex!r}")
+            return {}
+
+    def _upsert(self, user_id, **fields):
+        entity = {"PartitionKey": "user", "RowKey": str(user_id)}
+        entity.update(fields)
+        try:
+            self._client.upsert_entity(entity)  # default mode merges fields
+        except Exception as ex:
+            logger.warning(f"user_store.upsert failed: {ex!r}")
+
+    def set_default_lang(self, user_id, locale2):
+        self._upsert(user_id, default_lang=locale2 or "")
+
+    def add_recent_lang(self, user_id, locale2):
+        u = self.get_user(user_id)
+        recent = [x for x in u.get("recent", "").split(",") if x]
+        recent = [locale2] + [x for x in recent if x != locale2]
+        self._upsert(user_id, recent=",".join(recent[:MAX_RECENT_LANGS]))
+
+
+def _build_user_store():
+    if not AZURE_STORAGE_CONNECTION_STRING:
+        logger.info("No AZURE_STORAGE_CONNECTION_STRING — using in-memory user store.")
+        return _MemoryStore()
+    try:
+        store = _TableStore(AZURE_STORAGE_CONNECTION_STRING)
+        logger.info("User store: Azure Table Storage.")
+        return store
+    except Exception as ex:
+        logger.error(f"Table store init failed ({ex!r}); using in-memory store.")
+        return _MemoryStore()
+
+
+user_store = _build_user_store()
 
 # Detected OCR locale (2-letter) -> Azure Neural TTS voice + display name/flag.
 # Drives both auto-pick (from OCR language detection) and the manual picker.
@@ -552,20 +676,26 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         f"{t(update, 'welcome')}\n{t(update, 'help')}"
     )
 
-def build_language_keyboard(update: Update, detected_locale) -> InlineKeyboardMarkup:
+def build_language_keyboard(update: Update, detected_locale, recent=None) -> InlineKeyboardMarkup:
     """Inline keyboard: detected language pinned first (if recognized), then the
-    curated target-market languages, 2 per row. No typing required — built for
-    screen-reader users who navigate by tapping buttons."""
+    user's recently-used languages, then the curated target-market languages,
+    2 per row, de-duplicated. No typing required — built for screen-reader users
+    who navigate by tapping buttons."""
     rows = []
+    seen = set()
     if detected_locale in VOICE_MAP:
         info = VOICE_MAP[detected_locale]
         rows.append([InlineKeyboardButton(
             t(update, "detected_choice").format(lang=f'{info["flag"]} {info["name"]}'),
             callback_data=f"lang:{detected_locale}")])
+        seen.add(detected_locale)
+    ordered = []
+    for code in (list(recent or []) + MENU_LANGS):
+        if code in VOICE_MAP and code not in seen:
+            seen.add(code)
+            ordered.append(code)
     row = []
-    for code in MENU_LANGS:
-        if code == detected_locale:
-            continue
+    for code in ordered:
         info = VOICE_MAP[code]
         row.append(InlineKeyboardButton(f'{info["flag"]} {info["name"]}', callback_data=f"lang:{code}"))
         if len(row) == 2:
@@ -637,7 +767,17 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             "file_type": file_type, "file_size_kb": file_size_kb,
         }
 
-        if (locale2 in VOICE_MAP and conf >= AUTO_DETECT_MIN_CONFIDENCE
+        prefs = user_store.get_user(user_id)
+        default_lang = (prefs.get("default_lang") or "").strip()
+        if default_lang in VOICE_MAP:
+            # User pinned a language via /language — skip detection and the menu.
+            info = VOICE_MAP[default_lang]
+            await status_message.edit_text(
+                t(update, "using_default").format(lang=f'{info["flag"]} {info["name"]}')
+            )
+            stop_typing.set()
+            await synthesize_and_send(update, context, default_lang, status_message=None)
+        elif (locale2 in VOICE_MAP and conf >= AUTO_DETECT_MIN_CONFIDENCE
                 and coverage >= AUTO_DETECT_MIN_COVERAGE):
             info = VOICE_MAP[locale2]
             await status_message.edit_text(
@@ -646,9 +786,10 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             stop_typing.set()
             await synthesize_and_send(update, context, locale2, status_message=None)
         else:
+            recent = [c for c in prefs.get("recent", "").split(",") if c]
             await status_message.edit_text(
                 t(update, "choose_language"),
-                reply_markup=build_language_keyboard(update, locale2)
+                reply_markup=build_language_keyboard(update, locale2, recent)
             )
     except Exception as e:
         logger.error(f"OCR/handle exception for user {user_id}: {e!r}")
@@ -785,9 +926,73 @@ async def on_language_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     if not data.startswith("lang:"):
         return
     locale2 = data.split(":", 1)[1]
+    if locale2 in VOICE_MAP:
+        try:
+            user_store.add_recent_lang(update.effective_user.id, locale2)
+        except Exception as ex:
+            logger.warning(f"add_recent_lang failed: {ex!r}")
     await synthesize_and_send(update, context, locale2, status_message=query.message)
 
+
+def build_default_lang_keyboard(update: Update) -> InlineKeyboardMarkup:
+    """Picker for the /language command: 'Auto-detect' plus the curated languages."""
+    rows = [[InlineKeyboardButton(t(update, "auto_button"), callback_data="setlang:auto")]]
+    row = []
+    for code in MENU_LANGS:
+        info = VOICE_MAP[code]
+        row.append(InlineKeyboardButton(f'{info["flag"]} {info["name"]}', callback_data=f"setlang:{code}"))
+        if len(row) == 2:
+            rows.append(row)
+            row = []
+    if row:
+        rows.append(row)
+    return InlineKeyboardMarkup(rows)
+
+
+async def language_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_text(
+        t(update, "language_menu"), reply_markup=build_default_lang_keyboard(update)
+    )
+
+
+async def on_setlang_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+    data = query.data or ""
+    if not data.startswith("setlang:"):
+        return
+    choice = data.split(":", 1)[1]
+    user_id = update.effective_user.id
+    if choice == "auto":
+        try:
+            user_store.set_default_lang(user_id, "")
+        except Exception as ex:
+            logger.warning(f"set_default_lang failed: {ex!r}")
+        await query.edit_message_text(t(update, "default_auto"))
+    elif choice in VOICE_MAP:
+        try:
+            user_store.set_default_lang(user_id, choice)
+        except Exception as ex:
+            logger.warning(f"set_default_lang failed: {ex!r}")
+        info = VOICE_MAP[choice]
+        await query.edit_message_text(
+            t(update, "default_set").format(lang=f'{info["flag"]} {info["name"]}')
+        )
+
 # --- Main entrypoint ---
+async def _post_init(application) -> None:
+    """Register the slash-command menu so /language is discoverable."""
+    from telegram import BotCommand
+    try:
+        await application.bot.set_my_commands([
+            BotCommand("start", "Start / how it works"),
+            BotCommand("help", "How to use the bot"),
+            BotCommand("language", "Set audio language (or auto-detect)"),
+        ])
+    except Exception as ex:
+        logger.warning(f"set_my_commands failed: {ex!r}")
+
+
 def main() -> None:
     app = (
         ApplicationBuilder()
@@ -795,11 +1000,14 @@ def main() -> None:
         .read_timeout(60)
         .write_timeout(60)
         .connect_timeout(15)
+        .post_init(_post_init)
         .build()
     )
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(CommandHandler("language", language_command))
     app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO, handle_file))
+    app.add_handler(CallbackQueryHandler(on_setlang_callback, pattern=r"^setlang:"))
     app.add_handler(CallbackQueryHandler(on_language_callback, pattern=r"^lang:"))
 
     if WEBHOOK_URL:
