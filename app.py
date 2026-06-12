@@ -123,6 +123,9 @@ MESSAGES = {
         "auto_button": "🔄 Auto-detect",
         "default_set": "✅ Default language set: {lang}.",
         "default_auto": "✅ Auto-detect enabled — I'll detect each document's language.",
+        "lang_hint": "🌐 By default I detect the document's language automatically. To always use a specific language, tap /language.",
+        "bot_description": "Send a photo or PDF and I'll read the text aloud as a voice message. I detect the language automatically — or set one with /language. Made to help people with low vision.",
+        "bot_short_description": "Photo/PDF → voice message. Automatic language detection. Helps people with low vision.",
     },
     "ru": {
         "welcome": "👋 Добро пожаловать в бот Yonchee Text2Speech!",
@@ -156,6 +159,9 @@ MESSAGES = {
         "auto_button": "🔄 Авто-определение",
         "default_set": "✅ Язык по умолчанию установлен: {lang}.",
         "default_auto": "✅ Включено авто-определение — буду определять язык каждого документа.",
+        "lang_hint": "🌐 По умолчанию я определяю язык документа автоматически. Чтобы всегда использовать конкретный язык — нажмите /language.",
+        "bot_description": "Пришлите фото или PDF, и я прочитаю текст вслух голосовым сообщением. Язык определяю автоматически — или задайте его через /language. Создан, чтобы помогать людям со слабым зрением.",
+        "bot_short_description": "Фото/PDF → голосовое сообщение. Автоопределение языка. Помогает людям со слабым зрением.",
     },
     "uk": {
         "welcome": "👋 Ласкаво просимо до бота Yonchee Text2Speech!",
@@ -189,6 +195,9 @@ MESSAGES = {
         "auto_button": "🔄 Авто-визначення",
         "default_set": "✅ Мову за замовчуванням встановлено: {lang}.",
         "default_auto": "✅ Увімкнено авто-визначення — визначатиму мову кожного документа.",
+        "lang_hint": "🌐 За замовчуванням я визначаю мову документа автоматично. Щоб завжди використовувати певну мову — натисніть /language.",
+        "bot_description": "Надішліть фото або PDF, і я прочитаю текст уголос голосовим повідомленням. Мову визначаю автоматично — або задайте її через /language. Створений, щоб допомагати людям зі слабким зором.",
+        "bot_short_description": "Фото/PDF → голосове повідомлення. Автовизначення мови. Допомагає людям зі слабким зором.",
     },
     "es": {
         "welcome": "👋 ¡Bienvenido al bot Yonchee Text2Speech!",
@@ -222,6 +231,9 @@ MESSAGES = {
         "auto_button": "🔄 Detección automática",
         "default_set": "✅ Idioma predeterminado establecido: {lang}.",
         "default_auto": "✅ Detección automática activada: detectaré el idioma de cada documento.",
+        "lang_hint": "🌐 Por defecto detecto el idioma del documento automáticamente. Para usar siempre un idioma concreto, toca /language.",
+        "bot_description": "Envía una foto o PDF y leeré el texto en voz alta como mensaje de voz. Detecto el idioma automáticamente — o configúralo con /language. Creado para ayudar a personas con baja visión.",
+        "bot_short_description": "Foto/PDF → mensaje de voz. Detección automática de idioma. Ayuda a personas con baja visión.",
     },
     "de": {
         "welcome": "👋 Willkommen beim Yonchee Text2Speech-Bot!",
@@ -255,6 +267,9 @@ MESSAGES = {
         "auto_button": "🔄 Automatisch erkennen",
         "default_set": "✅ Standardsprache festgelegt: {lang}.",
         "default_auto": "✅ Automatische Erkennung aktiviert – ich erkenne die Sprache jedes Dokuments.",
+        "lang_hint": "🌐 Standardmäßig erkenne ich die Sprache des Dokuments automatisch. Für eine feste Sprache tippe auf /language.",
+        "bot_description": "Sende ein Foto oder PDF und ich lese den Text als Sprachnachricht vor. Die Sprache erkenne ich automatisch — oder lege sie mit /language fest. Für Menschen mit Sehbehinderung.",
+        "bot_short_description": "Foto/PDF → Sprachnachricht. Automatische Spracherkennung. Für Menschen mit Sehbehinderung.",
     },
     "fr": {
         "welcome": "👋 Bienvenue sur le bot Yonchee Text2Speech !",
@@ -288,6 +303,9 @@ MESSAGES = {
         "auto_button": "🔄 Détection automatique",
         "default_set": "✅ Langue par défaut définie : {lang}.",
         "default_auto": "✅ Détection automatique activée — je détecterai la langue de chaque document.",
+        "lang_hint": "🌐 Par défaut, je détecte automatiquement la langue du document. Pour toujours utiliser une langue précise, tape sur /language.",
+        "bot_description": "Envoie une photo ou un PDF et je lis le texte à voix haute en message vocal. Je détecte la langue automatiquement — ou définis-la avec /language. Conçu pour aider les personnes malvoyantes.",
+        "bot_short_description": "Photo/PDF → message vocal. Détection automatique de la langue. Aide les personnes malvoyantes.",
     },
     "pl": {
         "welcome": "👋 Witaj w bocie Yonchee Text2Speech!",
@@ -321,6 +339,9 @@ MESSAGES = {
         "auto_button": "🔄 Wykrywanie automatyczne",
         "default_set": "✅ Ustawiono domyślny język: {lang}.",
         "default_auto": "✅ Włączono automatyczne wykrywanie — wykryję język każdego dokumentu.",
+        "lang_hint": "🌐 Domyślnie wykrywam język dokumentu automatycznie. Aby zawsze używać konkretnego języka, naciśnij /language.",
+        "bot_description": "Wyślij zdjęcie lub PDF, a przeczytam tekst na głos jako wiadomość głosową. Język wykrywam automatycznie — lub ustaw go przez /language. Stworzony, by pomagać osobom słabowidzącym.",
+        "bot_short_description": "Zdjęcie/PDF → wiadomość głosowa. Automatyczne wykrywanie języka. Pomaga osobom słabowidzącym.",
     },
     "pt": {
         "welcome": "👋 Bem-vindo ao bot Yonchee Text2Speech!",
@@ -354,6 +375,9 @@ MESSAGES = {
         "auto_button": "🔄 Detecção automática",
         "default_set": "✅ Idioma padrão definido: {lang}.",
         "default_auto": "✅ Detecção automática ativada — vou detectar o idioma de cada documento.",
+        "lang_hint": "🌐 Por padrão, detecto o idioma do documento automaticamente. Para usar sempre um idioma específico, toque em /language.",
+        "bot_description": "Envie uma foto ou PDF e eu leio o texto em voz alta como mensagem de voz. Detecto o idioma automaticamente — ou defina com /language. Feito para ajudar pessoas com baixa visão.",
+        "bot_short_description": "Foto/PDF → mensagem de voz. Detecção automática de idioma. Ajuda pessoas com baixa visão.",
     },
 }
 DEFAULT_UI_LANG = "en"
@@ -673,7 +697,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     lang_code = update.effective_user.language_code[:2] if update.effective_user.language_code else "Unknown"
     logger.info(f"UserStartedBot: user_id={user_id}, lang={lang_code}")
     await update.message.reply_text(
-        f"{t(update, 'welcome')}\n{t(update, 'help')}"
+        f"{t(update, 'welcome')}\n{t(update, 'help')}\n\n{t(update, 'lang_hint')}"
     )
 
 def build_language_keyboard(update: Update, detected_locale, recent=None) -> InlineKeyboardMarkup:
@@ -980,8 +1004,23 @@ async def on_setlang_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
 
 # --- Main entrypoint ---
+async def _set_bot_descriptions(bot) -> None:
+    """Set the localized bot profile description (shown before a user taps Start)
+    and the short description, for each supported UI language."""
+    try:
+        await bot.set_my_description(MESSAGES["en"]["bot_description"])
+        await bot.set_my_short_description(MESSAGES["en"]["bot_short_description"])
+        for lang in MESSAGES:
+            await bot.set_my_description(MESSAGES[lang]["bot_description"], language_code=lang)
+            await bot.set_my_short_description(MESSAGES[lang]["bot_short_description"], language_code=lang)
+    except Exception as ex:
+        logger.warning(f"set_my_description failed: {ex!r}")
+
+
 async def _post_init(application) -> None:
-    """Register the slash-command menu so /language is discoverable."""
+    """Register the slash-command menu so /language is discoverable, and set the
+    bot descriptions in the background (they aren't needed to serve requests, so
+    we don't block cold-start readiness on them)."""
     from telegram import BotCommand
     try:
         await application.bot.set_my_commands([
@@ -991,6 +1030,7 @@ async def _post_init(application) -> None:
         ])
     except Exception as ex:
         logger.warning(f"set_my_commands failed: {ex!r}")
+    asyncio.create_task(_set_bot_descriptions(application.bot))
 
 
 def main() -> None:
