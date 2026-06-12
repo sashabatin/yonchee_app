@@ -77,7 +77,7 @@ jobs:
               appinsights-instrumentationkey=${{ secrets.APPINSIGHTS_INSTRUMENTATIONKEY }} \
               webhook-url=${{ env.WEBHOOK_URL }} \
               webhook-secret=${{ secrets.WEBHOOK_SECRET_DEV }} \
-              azure-storage-connection-string=${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
+              azure-storage-connection-string="${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}"
 
       - name: Deploy to Azure Container App (dev)
         run: |
@@ -147,7 +147,7 @@ jobs:
               appinsights-instrumentationkey=${{ secrets.APPINSIGHTS_INSTRUMENTATIONKEY }} \
               webhook-url=${{ env.WEBHOOK_URL }} \
               webhook-secret=${{ secrets.WEBHOOK_SECRET_PROD }} \
-              azure-storage-connection-string=${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
+              azure-storage-connection-string="${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}"
 
       - name: Deploy to Azure Container App (prod)
         run: |
