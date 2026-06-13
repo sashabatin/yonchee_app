@@ -124,7 +124,7 @@ MESSAGES = {
         "auto_button": "🔄 Auto-detect",
         "default_set": "✅ Default language set: {lang}.",
         "default_auto": "✅ Auto-detect enabled — I'll detect each document's language.",
-        "lang_hint": "🌐 By default I detect the document's language automatically. To always use a specific language, tap /language.",
+        "lang_hint": "🌐 By default I detect the document's language automatically. If I get it wrong, or to always use a specific language, tap /language.",
         "bot_description": "Send a photo or PDF and I'll read the text aloud as a voice message. I detect the language automatically — or set one with /language. Made to help people with low vision.",
         "bot_short_description": "Photo/PDF → voice message. Automatic language detection. Helps people with low vision.",
         "feedback_prompt": "📝 Please type your feedback in the next message — I'll pass it on. (You can also use /feedback your text.)",
@@ -162,7 +162,7 @@ MESSAGES = {
         "auto_button": "🔄 Авто-определение",
         "default_set": "✅ Язык по умолчанию установлен: {lang}.",
         "default_auto": "✅ Включено авто-определение — буду определять язык каждого документа.",
-        "lang_hint": "🌐 По умолчанию я определяю язык документа автоматически. Чтобы всегда использовать конкретный язык — нажмите /language.",
+        "lang_hint": "🌐 По умолчанию я определяю язык документа автоматически. Если язык определён неверно — или чтобы всегда использовать конкретный — нажмите /language.",
         "bot_description": "Пришлите фото или PDF, и я прочитаю текст вслух голосовым сообщением. Язык определяю автоматически — или задайте его через /language. Создан, чтобы помогать людям со слабым зрением.",
         "bot_short_description": "Фото/PDF → голосовое сообщение. Автоопределение языка. Помогает людям со слабым зрением.",
         "feedback_prompt": "📝 Напишите ваш отзыв следующим сообщением — я его передам. (Можно и так: /feedback ваш текст.)",
@@ -200,7 +200,7 @@ MESSAGES = {
         "auto_button": "🔄 Авто-визначення",
         "default_set": "✅ Мову за замовчуванням встановлено: {lang}.",
         "default_auto": "✅ Увімкнено авто-визначення — визначатиму мову кожного документа.",
-        "lang_hint": "🌐 За замовчуванням я визначаю мову документа автоматично. Щоб завжди використовувати певну мову — натисніть /language.",
+        "lang_hint": "🌐 За замовчуванням я визначаю мову документа автоматично. Якщо мову визначено неправильно — або щоб завжди використовувати певну — натисніть /language.",
         "bot_description": "Надішліть фото або PDF, і я прочитаю текст уголос голосовим повідомленням. Мову визначаю автоматично — або задайте її через /language. Створений, щоб допомагати людям зі слабким зором.",
         "bot_short_description": "Фото/PDF → голосове повідомлення. Автовизначення мови. Допомагає людям зі слабким зором.",
         "feedback_prompt": "📝 Напишіть ваш відгук наступним повідомленням — я його передам. (Можна й так: /feedback ваш текст.)",
@@ -238,7 +238,7 @@ MESSAGES = {
         "auto_button": "🔄 Detección automática",
         "default_set": "✅ Idioma predeterminado establecido: {lang}.",
         "default_auto": "✅ Detección automática activada: detectaré el idioma de cada documento.",
-        "lang_hint": "🌐 Por defecto detecto el idioma del documento automáticamente. Para usar siempre un idioma concreto, toca /language.",
+        "lang_hint": "🌐 Por defecto detecto el idioma del documento automáticamente. Si me equivoco, o para usar siempre un idioma concreto, toca /language.",
         "bot_description": "Envía una foto o PDF y leeré el texto en voz alta como mensaje de voz. Detecto el idioma automáticamente — o configúralo con /language. Creado para ayudar a personas con baja visión.",
         "bot_short_description": "Foto/PDF → mensaje de voz. Detección automática de idioma. Ayuda a personas con baja visión.",
         "feedback_prompt": "📝 Escribe tu comentario en el siguiente mensaje — lo transmitiré. (También puedes usar /feedback tu texto.)",
@@ -276,7 +276,7 @@ MESSAGES = {
         "auto_button": "🔄 Automatisch erkennen",
         "default_set": "✅ Standardsprache festgelegt: {lang}.",
         "default_auto": "✅ Automatische Erkennung aktiviert – ich erkenne die Sprache jedes Dokuments.",
-        "lang_hint": "🌐 Standardmäßig erkenne ich die Sprache des Dokuments automatisch. Für eine feste Sprache tippe auf /language.",
+        "lang_hint": "🌐 Standardmäßig erkenne ich die Sprache des Dokuments automatisch. Wenn ich falsch liege, oder für eine feste Sprache, tippe auf /language.",
         "bot_description": "Sende ein Foto oder PDF und ich lese den Text als Sprachnachricht vor. Die Sprache erkenne ich automatisch — oder lege sie mit /language fest. Für Menschen mit Sehbehinderung.",
         "bot_short_description": "Foto/PDF → Sprachnachricht. Automatische Spracherkennung. Für Menschen mit Sehbehinderung.",
         "feedback_prompt": "📝 Schreib dein Feedback in die nächste Nachricht — ich leite es weiter. (Oder nutze /feedback dein Text.)",
@@ -314,7 +314,7 @@ MESSAGES = {
         "auto_button": "🔄 Détection automatique",
         "default_set": "✅ Langue par défaut définie : {lang}.",
         "default_auto": "✅ Détection automatique activée — je détecterai la langue de chaque document.",
-        "lang_hint": "🌐 Par défaut, je détecte automatiquement la langue du document. Pour toujours utiliser une langue précise, tape sur /language.",
+        "lang_hint": "🌐 Par défaut, je détecte automatiquement la langue du document. Si je me trompe, ou pour toujours utiliser une langue précise, tape sur /language.",
         "bot_description": "Envoie une photo ou un PDF et je lis le texte à voix haute en message vocal. Je détecte la langue automatiquement — ou définis-la avec /language. Conçu pour aider les personnes malvoyantes.",
         "bot_short_description": "Photo/PDF → message vocal. Détection automatique de la langue. Aide les personnes malvoyantes.",
         "feedback_prompt": "📝 Écris ton retour dans le prochain message — je le transmettrai. (Tu peux aussi utiliser /feedback ton texte.)",
@@ -352,7 +352,7 @@ MESSAGES = {
         "auto_button": "🔄 Wykrywanie automatyczne",
         "default_set": "✅ Ustawiono domyślny język: {lang}.",
         "default_auto": "✅ Włączono automatyczne wykrywanie — wykryję język każdego dokumentu.",
-        "lang_hint": "🌐 Domyślnie wykrywam język dokumentu automatycznie. Aby zawsze używać konkretnego języka, naciśnij /language.",
+        "lang_hint": "🌐 Domyślnie wykrywam język dokumentu automatycznie. Jeśli się pomylę, lub aby zawsze używać konkretnego języka, naciśnij /language.",
         "bot_description": "Wyślij zdjęcie lub PDF, a przeczytam tekst na głos jako wiadomość głosową. Język wykrywam automatycznie — lub ustaw go przez /language. Stworzony, by pomagać osobom słabowidzącym.",
         "bot_short_description": "Zdjęcie/PDF → wiadomość głosowa. Automatyczne wykrywanie języka. Pomaga osobom słabowidzącym.",
         "feedback_prompt": "📝 Napisz swoją opinię w następnej wiadomości — przekażę ją. (Możesz też użyć /feedback twój tekst.)",
@@ -390,7 +390,7 @@ MESSAGES = {
         "auto_button": "🔄 Detecção automática",
         "default_set": "✅ Idioma padrão definido: {lang}.",
         "default_auto": "✅ Detecção automática ativada — vou detectar o idioma de cada documento.",
-        "lang_hint": "🌐 Por padrão, detecto o idioma do documento automaticamente. Para usar sempre um idioma específico, toque em /language.",
+        "lang_hint": "🌐 Por padrão, detecto o idioma do documento automaticamente. Se eu errar, ou para usar sempre um idioma específico, toque em /language.",
         "bot_description": "Envie uma foto ou PDF e eu leio o texto em voz alta como mensagem de voz. Detecto o idioma automaticamente — ou defina com /language. Feito para ajudar pessoas com baixa visão.",
         "bot_short_description": "Foto/PDF → mensagem de voz. Detecção automática de idioma. Ajuda pessoas com baixa visão.",
         "feedback_prompt": "📝 Escreva seu comentário na próxima mensagem — vou repassá-lo. (Você também pode usar /feedback seu texto.)",
@@ -679,6 +679,14 @@ SCRIPT_RANGES = [
 # can still pick any language in VOICE_MAP beyond this list.
 MENU_LANGS = ["en", "uk", "ru", "es", "de", "fr", "pl", "pt", "it", "nl", "tr", "kk", "ka", "hy"]
 
+# When a user has pinned one of these languages, we pass it to Azure Read as a
+# `locale` hint, which helps recognition on degraded images (e.g. it stops badly-
+# photographed Cyrillic from being read as Latin). Restricted to locales the qa
+# harness confirmed Azure Read handles well: Kazakh ('kk') is excluded because the
+# hint made it *worse* (read as Khmer), and ka/hy go through the fallback OCR
+# engine, so a Read locale never applies to them.
+OCR_LOCALE_HINT_LANGS = {"en", "uk", "ru", "es", "de", "fr", "pl", "pt", "it", "nl", "tr"}
+
 # Auto-proceed to synthesis only when detection is at least this confident and
 # the dominant language covers at least this fraction of the text; else we ask.
 AUTO_DETECT_MIN_CONFIDENCE = 0.6
@@ -807,7 +815,12 @@ MAX_SIZE = 17 * 1024 * 1024
 # --- Util functions ---
 def normalize_ocr_text(raw_text: str) -> str:
     text = raw_text.replace('\r\n', '\n').replace('\r', '\n')
-    text = re.sub(r'-\s*\n\s*', '', text)
+    # Join words hyphenated across a line break — but only with letters on both
+    # sides, so numeric codes/ranges (e.g. "2.02.05-2020", "10-15") aren't merged
+    # into "2.02.052020". A hyphen at a line break next to a digit keeps the
+    # hyphen and just drops the break.
+    text = re.sub(r'(?<=[^\W\d_])-\s*\n\s*(?=[^\W\d_])', '', text)
+    text = re.sub(r'-\s*\n\s*(?=\d)', '-', text)
     text = re.sub(r'(?<!\n)\n(?!\n)', ' ', text)
     text = re.sub(r'\n{3,}', '\n\n', text)
     text = re.sub(r' +', ' ', text)
@@ -944,10 +957,15 @@ def extract_text(file_path: str, file_type: str, pinned_lang: str = None) -> Ocr
         raw = run_fallback_ocr(file_path, file_type, pinned_lang)
         return OcrResult(normalize_ocr_text(raw or ""), None, None, 0.0, 0.0, None, True)
 
+    # A pinned language on the allowlist is passed to Azure Read as a locale hint,
+    # which helps recognition on hard/degraded images. Omitted in the auto-detect
+    # path (pinned_lang is None), where the language isn't known yet, and for
+    # languages where the hint doesn't help (see OCR_LOCALE_HINT_LANGS).
+    analyze_kwargs = {"features": [DocumentAnalysisFeature.LANGUAGES]}
+    if pinned_lang in OCR_LOCALE_HINT_LANGS:
+        analyze_kwargs["locale"] = pinned_lang
     with open(file_path, "rb") as f:
-        poller = doc_client.begin_analyze_document(
-            "prebuilt-read", f, features=[DocumentAnalysisFeature.LANGUAGES]
-        )
+        poller = doc_client.begin_analyze_document("prebuilt-read", f, **analyze_kwargs)
         result = poller.result()
     ocr_pages = len(result.pages)
     extracted_text = ""
@@ -1029,7 +1047,10 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             await synthesize_and_send(update, context, default_lang, status_message=None)
             return
 
-        ocr = extract_text(file_path, file_type)
+        # If the user pinned a hint-eligible language, pass it so Azure Read gets a
+        # locale hint; otherwise (auto-detect) extract without one.
+        hint_lang = default_lang if default_lang in OCR_LOCALE_HINT_LANGS else None
+        ocr = extract_text(file_path, file_type, pinned_lang=hint_lang)
         normalized_text = ocr.text
         ocr_pages = ocr.ocr_pages
         ocr_ms = round((time.monotonic() - t0) * 1000)
@@ -1091,16 +1112,55 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             pass
         remove_temp_file(file_path)
 
+def prepare_tts_text(text: str, locale2: str) -> str:
+    """Light, language-specific text cleanup before synthesis.
+
+    Ukrainian only (ru/en already sound fine, so we don't touch them):
+    - The OCR flattens м²→м2 / м³→м3, which the uk voice reads as "ем два"; we
+      expand those to words.
+    - The uk voice reads large numbers digit by digit ("один два п'ять нуль…")
+      and ignores <say-as>, so we spell them out as words ("один мільйон двісті
+      п'ятдесят тисяч") via num2words. Times/dates/codes/phones/years are left
+      alone (only standalone integers of 5+ digits, or space-grouped millions).
+    """
+    if locale2 == "uk":
+        text = re.sub(r'(?<=\d)\s*м\s*[²2](?![\d²³])', ' квадратних метрів', text)
+        text = re.sub(r'(?<=\d)\s*м\s*[³3](?![\d²³])', ' кубічних метрів', text)
+        text = _spell_large_numbers(text, "uk")
+    return text
+
+
+def _spell_large_numbers(text: str, lang: str) -> str:
+    """Replace large integers (grouped "1 250 000" or plain "1250000") with their
+    word form so a voice can't read them digit by digit. num2words is imported
+    lazily and missing it degrades gracefully (number left as-is)."""
+    try:
+        from num2words import num2words
+    except ImportError:
+        return text
+
+    def repl(m):
+        try:
+            return num2words(int(m.group(0).replace(' ', '')), lang=lang)
+        except Exception:
+            return m.group(0)
+
+    text = re.sub(r'(?<!\d)\d{1,3}(?: \d{3}){2,}(?!\d)', repl, text)  # grouped millions
+    text = re.sub(r'(?<![\d.:+\-])\d{5,}(?![\d.:\-])', repl, text)     # plain 5+ digits
+    return text
+
+
 def synthesize_to_file(text: str, locale2: str, out_path: str):
     """Synthesize `text` to an MP3 at out_path using the voice for locale2
     (English fallback). Returns the Azure SpeechSynthesisResult so callers can
     inspect result.reason / cancellation_details. No Telegram coupling, so it's
     reusable by the qa toolkit."""
     info = VOICE_MAP.get(locale2) or VOICE_MAP["en"]
+    body = escape_ssml(prepare_tts_text(text, locale2))
     ssml = f"""
 <speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="{info['lang_code']}">
   <voice name="{info['voice']}">
-    {escape_ssml(text)}
+    {body}
   </voice>
 </speak>
 """
