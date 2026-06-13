@@ -77,7 +77,8 @@ jobs:
               appinsights-instrumentationkey=${{ secrets.APPINSIGHTS_INSTRUMENTATIONKEY }} \
               webhook-url=${{ env.WEBHOOK_URL }} \
               webhook-secret=${{ secrets.WEBHOOK_SECRET_DEV }} \
-              azure-storage-connection-string="${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}"
+              azure-storage-connection-string="${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}" \
+              anthropic-api-key="${{ secrets.ANTHROPIC_API_KEY }}"
 
       - name: Deploy to Azure Container App (dev)
         run: |
@@ -98,7 +99,8 @@ jobs:
               AZURE_SPEECH_API_KEY=secretref:azure-speech-api-key \
               AZURE_REGION=secretref:azure-region \
               APPINSIGHTS_INSTRUMENTATIONKEY=secretref:appinsights-instrumentationkey \
-              AZURE_STORAGE_CONNECTION_STRING=secretref:azure-storage-connection-string
+              AZURE_STORAGE_CONNECTION_STRING=secretref:azure-storage-connection-string \
+              ANTHROPIC_API_KEY=secretref:anthropic-api-key
 
       - name: Register Telegram webhook (dev)
         run: |
@@ -147,7 +149,8 @@ jobs:
               appinsights-instrumentationkey=${{ secrets.APPINSIGHTS_INSTRUMENTATIONKEY }} \
               webhook-url=${{ env.WEBHOOK_URL }} \
               webhook-secret=${{ secrets.WEBHOOK_SECRET_PROD }} \
-              azure-storage-connection-string="${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}"
+              azure-storage-connection-string="${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}" \
+              anthropic-api-key="${{ secrets.ANTHROPIC_API_KEY }}"
 
       - name: Deploy to Azure Container App (prod)
         run: |
@@ -168,7 +171,8 @@ jobs:
               AZURE_SPEECH_API_KEY=secretref:azure-speech-api-key \
               AZURE_REGION=secretref:azure-region \
               APPINSIGHTS_INSTRUMENTATIONKEY=secretref:appinsights-instrumentationkey \
-              AZURE_STORAGE_CONNECTION_STRING=secretref:azure-storage-connection-string
+              AZURE_STORAGE_CONNECTION_STRING=secretref:azure-storage-connection-string \
+              ANTHROPIC_API_KEY=secretref:anthropic-api-key
 
       - name: Register Telegram webhook (prod)
         run: |
