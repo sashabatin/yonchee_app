@@ -98,7 +98,7 @@ def _quiet_sdk_logs():
         logging.getLogger(name).setLevel(logging.WARNING)
 
 
-def run(cases, dry_run=False, save_text=False):
+def run(cases, dry_run=False, save_text=False, pin_expected=False):
     import metrics  # local module
     results = []
     if not dry_run:
@@ -125,9 +125,13 @@ def run(cases, dry_run=False, save_text=False):
             continue
 
         t0 = time.monotonic()
+        # --pin-expected simulates a user who pinned their language via /language,
+        # so extract_text passes it to Azure Read as a locale hint (A/B testing).
+        pinned = case.get("pinned_lang")
+        if pin_expected and case.get("expected_lang"):
+            pinned = case["expected_lang"]
         try:
-            ocr = app.extract_text(str(src), _file_type_for(src),
-                                   pinned_lang=case.get("pinned_lang"))
+            ocr = app.extract_text(str(src), _file_type_for(src), pinned_lang=pinned)
         except Exception as ex:
             row["error"] = f"{type(ex).__name__}: {ex}"
             row["duration_ms"] = round((time.monotonic() - t0) * 1000)
@@ -203,6 +207,8 @@ def main():
                     help="validate the manifest without calling Azure (no cost)")
     ap.add_argument("--save-text", action="store_true",
                     help="store extracted (and expected) text in the results, for analyze.py")
+    ap.add_argument("--pin-expected", action="store_true",
+                    help="pass each case's expected_lang to OCR as a locale hint (A/B test)")
     args = ap.parse_args()
 
     cases = load_cases()
@@ -220,7 +226,8 @@ def main():
         sys.exit("No cases to run. Add some to cases.json (see qa/README.md).")
 
     print(f"Running {len(cases)} case(s){' (dry run)' if args.dry_run else ''}…")
-    results = run(cases, dry_run=args.dry_run, save_text=args.save_text)
+    results = run(cases, dry_run=args.dry_run, save_text=args.save_text,
+                  pin_expected=args.pin_expected)
     summary = summarize(results)
 
     print("\nSummary:")

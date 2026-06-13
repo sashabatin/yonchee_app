@@ -9,3 +9,5 @@ __pycache__/
 venv/
 .venv/
 .env.dev
+# Local-only notes / working context (never commit)
+*.local.md

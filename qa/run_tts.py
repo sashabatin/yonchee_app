@@ -37,16 +37,21 @@ sys.path.insert(0, str(REPO_ROOT))
 def main():
     ap = argparse.ArgumentParser(description="Smoke-test the bot's TTS voices.")
     ap.add_argument("--lang", help="comma-separated 2-letter codes (default: all sampled)")
+    ap.add_argument("--numbers", action="store_true",
+                    help="synthesize number-heavy samples (time/date/decimals/codes) to "
+                         "listen for digits sounding off; default langs ru,uk,ka,en")
     args = ap.parse_args()
 
     import logging
     import app
     from azure.cognitiveservices.speech import ResultReason
-    from generate_corpus import TEXTS  # reuse the embedded per-language samples
+    from generate_corpus import TEXTS, NUMBER_TEXTS
     for n in ("azure", "httpx", "httpcore", "urllib3"):
         logging.getLogger(n).setLevel(logging.WARNING)
 
-    langs = [c.strip() for c in args.lang.split(",")] if args.lang else list(TEXTS)
+    samples = NUMBER_TEXTS if args.numbers else TEXTS
+    default_langs = ["ru", "uk", "ka", "en"] if args.numbers else list(TEXTS)
+    langs = [c.strip() for c in args.lang.split(",")] if args.lang else default_langs
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     results = []
     print(f"Synthesizing {len(langs)} language(s)…")
@@ -57,9 +62,10 @@ def main():
             results.append(row)
             print(f"  ✗ {lang}: no voice in VOICE_MAP")
             continue
-        text = TEXTS.get(lang, ["Hello, this is a test."])[0]
+        sample = samples.get(lang, "Hello, this is a test.")
+        text = sample[0] if isinstance(sample, list) else sample  # TEXTS=list, NUMBER_TEXTS=str
         row.update({"voice": app.VOICE_MAP[lang]["voice"], "chars": len(text)})
-        out = OUT_DIR / f"{lang}.mp3"
+        out = OUT_DIR / (f"num-{lang}.mp3" if args.numbers else f"{lang}.mp3")
         t0 = time.monotonic()
         try:
             res = app.synthesize_to_file(text, lang, str(out))
