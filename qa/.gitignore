@@ -1,0 +1,12 @@
+# Run outputs are generated artifacts — keep them out of git.
+results/
+
+# Corpus binaries can be large; track the manifest + ground-truth text, not the
+# source images by default. Remove these lines if you want images versioned.
+corpus/images/*
+!corpus/images/.gitkeep
+
+# Generated corpus (reproducible from generate_corpus.py) — keep all of it,
+# including its manifest, out of git.
+corpus/gen/
+cases.gen.json

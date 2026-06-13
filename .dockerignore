@@ -1,0 +1,12 @@
+# QA toolkit and its outputs are dev-only — not needed in the bot image.
+qa/
+
+# Dev / VCS cruft
+.git/
+.github/
+.venv/
+venv/
+__pycache__/
+*.pyc
+.env
+docs/

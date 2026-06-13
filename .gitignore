@@ -7,4 +7,5 @@ __pycache__/
 *.log
 *.zip
 venv/
+.venv/
 .env.dev

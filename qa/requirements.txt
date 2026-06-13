@@ -1,0 +1,10 @@
+# QA toolkit dependencies — installed locally, NOT in the production image
+# (qa/ is excluded via .dockerignore, so prod never needs these).
+#
+#   python -m venv .venv
+#   .venv/Scripts/pip install -r qa/requirements.txt
+#
+# The toolkit imports the bot (app.py), so it needs the bot's deps too:
+-r ../requirements.txt
+# Plus image rendering for generate_corpus.py:
+Pillow>=10,<12
