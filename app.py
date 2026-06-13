@@ -566,7 +566,24 @@ VOICE_MAP = {
     "th": {"lang_code": "th-TH", "voice": "th-TH-PremwadeeNeural", "name": "ไทย",        "flag": "🇹🇭"},
     "vi": {"lang_code": "vi-VN", "voice": "vi-VN-HoaiMyNeural",    "name": "Tiếng Việt", "flag": "🇻🇳"},
     "zh": {"lang_code": "zh-CN", "voice": "zh-CN-XiaoxiaoNeural",  "name": "中文",        "flag": "🇨🇳"},
+    "ka": {"lang_code": "ka-GE", "voice": "ka-GE-EkaNeural",       "name": "ქართული",   "flag": "🇬🇪"},
+    "hy": {"lang_code": "hy-AM", "voice": "hy-AM-AnahitNeural",    "name": "Հայերեն",   "flag": "🇦🇲"},
 }
+
+# Unicode script ranges that map 1:1 to a language. Used to infer the content
+# language directly from the OCR text, which is far more reliable than Azure's
+# per-line guess for these distinct alphabets (e.g. Georgian was misread as Thai).
+SCRIPT_RANGES = [
+    ("ka", ((0x10A0, 0x10FF),)),                       # Georgian
+    ("hy", ((0x0530, 0x058F),)),                       # Armenian
+    ("el", ((0x0370, 0x03FF), (0x1F00, 0x1FFF))),      # Greek
+    ("he", ((0x0590, 0x05FF),)),                       # Hebrew
+    ("th", ((0x0E00, 0x0E7F),)),                       # Thai
+    ("hi", ((0x0900, 0x097F),)),                       # Devanagari
+    ("ko", ((0xAC00, 0xD7A3), (0x1100, 0x11FF))),      # Hangul
+    ("ja", ((0x3040, 0x30FF),)),                        # Japanese kana
+    ("han", ((0x4E00, 0x9FFF),)),                      # CJK Han (zh, or ja if kana present)
+]
 
 # Languages shown as buttons in the manual picker (target markets). Auto-detect
 # can still pick any language in VOICE_MAP beyond this list.
@@ -605,6 +622,39 @@ def detect_dominant_language(result):
     confidence = weighted_conf[best] / length[best] if length[best] else 0.0
     coverage = length[best] / total
     return best, confidence, coverage
+
+
+def detect_script_language(text):
+    """Infer language from the dominant Unicode script of the OCR text.
+
+    Reliable for scripts that map 1:1 to a language (Georgian, Armenian, Greek,
+    Hebrew, Thai, Devanagari, Hangul, Japanese kana). Returns a 2-letter code,
+    or None for shared scripts (Latin/Cyrillic/Arabic) where the script can't
+    distinguish the language — those defer to Azure's language detection.
+    """
+    counts = defaultdict(int)
+    letters = 0
+    for ch in text:
+        if not ch.isalpha():
+            continue
+        letters += 1
+        o = ord(ch)
+        for lang, ranges in SCRIPT_RANGES:
+            if any(lo <= o <= hi for lo, hi in ranges):
+                counts[lang] += 1
+                break
+    if letters == 0 or not counts:
+        return None
+    # CJK Han is shared: Japanese if any kana is present, otherwise Chinese.
+    if counts.get("han"):
+        if counts.get("ja"):
+            counts["ja"] += counts.pop("han")
+        else:
+            counts["zh"] = counts.pop("han")
+    best = max(counts, key=counts.get)
+    if counts[best] / letters >= 0.5:
+        return best
+    return None
 
 SUPPORTED_MIME = {
     "image/jpeg", "image/png", "image/tiff", "image/bmp",
@@ -785,8 +835,14 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                       file_type=file_type, file_size_kb=file_size_kb, duration_ms=ocr_ms)
             return
 
-        locale2, conf, coverage = detect_dominant_language(result)
-        logger.info(f"User {user_id}: detected lang={locale2} conf={conf:.2f} coverage={coverage:.2f}")
+        script_lang = detect_script_language(normalized_text)
+        if script_lang and script_lang in VOICE_MAP:
+            # A distinct script is authoritative — Azure's per-line language
+            # guess is unreliable for these (e.g. Georgian was detected as Thai).
+            locale2, conf, coverage = script_lang, 1.0, 1.0
+        else:
+            locale2, conf, coverage = detect_dominant_language(result)
+        logger.info(f"User {user_id}: script={script_lang} lang={locale2} conf={conf:.2f} coverage={coverage:.2f}")
         context.user_data["ocr_job"] = {
             "text": normalized_text, "ocr_pages": ocr_pages, "ocr_ms": ocr_ms,
             "file_type": file_type, "file_size_kb": file_size_kb,
