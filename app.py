@@ -126,6 +126,8 @@ MESSAGES = {
         "lang_hint": "🌐 By default I detect the document's language automatically. To always use a specific language, tap /language.",
         "bot_description": "Send a photo or PDF and I'll read the text aloud as a voice message. I detect the language automatically — or set one with /language. Made to help people with low vision.",
         "bot_short_description": "Photo/PDF → voice message. Automatic language detection. Helps people with low vision.",
+        "feedback_prompt": "📝 Please type your feedback in the next message — I'll pass it on. (You can also use /feedback your text.)",
+        "feedback_thanks": "🙏 Thank you for your feedback!",
     },
     "ru": {
         "welcome": "👋 Добро пожаловать в бот Yonchee Text2Speech!",
@@ -162,6 +164,8 @@ MESSAGES = {
         "lang_hint": "🌐 По умолчанию я определяю язык документа автоматически. Чтобы всегда использовать конкретный язык — нажмите /language.",
         "bot_description": "Пришлите фото или PDF, и я прочитаю текст вслух голосовым сообщением. Язык определяю автоматически — или задайте его через /language. Создан, чтобы помогать людям со слабым зрением.",
         "bot_short_description": "Фото/PDF → голосовое сообщение. Автоопределение языка. Помогает людям со слабым зрением.",
+        "feedback_prompt": "📝 Напишите ваш отзыв следующим сообщением — я его передам. (Можно и так: /feedback ваш текст.)",
+        "feedback_thanks": "🙏 Спасибо за отзыв!",
     },
     "uk": {
         "welcome": "👋 Ласкаво просимо до бота Yonchee Text2Speech!",
@@ -198,6 +202,8 @@ MESSAGES = {
         "lang_hint": "🌐 За замовчуванням я визначаю мову документа автоматично. Щоб завжди використовувати певну мову — натисніть /language.",
         "bot_description": "Надішліть фото або PDF, і я прочитаю текст уголос голосовим повідомленням. Мову визначаю автоматично — або задайте її через /language. Створений, щоб допомагати людям зі слабким зором.",
         "bot_short_description": "Фото/PDF → голосове повідомлення. Автовизначення мови. Допомагає людям зі слабким зором.",
+        "feedback_prompt": "📝 Напишіть ваш відгук наступним повідомленням — я його передам. (Можна й так: /feedback ваш текст.)",
+        "feedback_thanks": "🙏 Дякуємо за відгук!",
     },
     "es": {
         "welcome": "👋 ¡Bienvenido al bot Yonchee Text2Speech!",
@@ -234,6 +240,8 @@ MESSAGES = {
         "lang_hint": "🌐 Por defecto detecto el idioma del documento automáticamente. Para usar siempre un idioma concreto, toca /language.",
         "bot_description": "Envía una foto o PDF y leeré el texto en voz alta como mensaje de voz. Detecto el idioma automáticamente — o configúralo con /language. Creado para ayudar a personas con baja visión.",
         "bot_short_description": "Foto/PDF → mensaje de voz. Detección automática de idioma. Ayuda a personas con baja visión.",
+        "feedback_prompt": "📝 Escribe tu comentario en el siguiente mensaje — lo transmitiré. (También puedes usar /feedback tu texto.)",
+        "feedback_thanks": "🙏 ¡Gracias por tu comentario!",
     },
     "de": {
         "welcome": "👋 Willkommen beim Yonchee Text2Speech-Bot!",
@@ -270,6 +278,8 @@ MESSAGES = {
         "lang_hint": "🌐 Standardmäßig erkenne ich die Sprache des Dokuments automatisch. Für eine feste Sprache tippe auf /language.",
         "bot_description": "Sende ein Foto oder PDF und ich lese den Text als Sprachnachricht vor. Die Sprache erkenne ich automatisch — oder lege sie mit /language fest. Für Menschen mit Sehbehinderung.",
         "bot_short_description": "Foto/PDF → Sprachnachricht. Automatische Spracherkennung. Für Menschen mit Sehbehinderung.",
+        "feedback_prompt": "📝 Schreib dein Feedback in die nächste Nachricht — ich leite es weiter. (Oder nutze /feedback dein Text.)",
+        "feedback_thanks": "🙏 Danke für dein Feedback!",
     },
     "fr": {
         "welcome": "👋 Bienvenue sur le bot Yonchee Text2Speech !",
@@ -306,6 +316,8 @@ MESSAGES = {
         "lang_hint": "🌐 Par défaut, je détecte automatiquement la langue du document. Pour toujours utiliser une langue précise, tape sur /language.",
         "bot_description": "Envoie une photo ou un PDF et je lis le texte à voix haute en message vocal. Je détecte la langue automatiquement — ou définis-la avec /language. Conçu pour aider les personnes malvoyantes.",
         "bot_short_description": "Photo/PDF → message vocal. Détection automatique de la langue. Aide les personnes malvoyantes.",
+        "feedback_prompt": "📝 Écris ton retour dans le prochain message — je le transmettrai. (Tu peux aussi utiliser /feedback ton texte.)",
+        "feedback_thanks": "🙏 Merci pour ton retour !",
     },
     "pl": {
         "welcome": "👋 Witaj w bocie Yonchee Text2Speech!",
@@ -342,6 +354,8 @@ MESSAGES = {
         "lang_hint": "🌐 Domyślnie wykrywam język dokumentu automatycznie. Aby zawsze używać konkretnego języka, naciśnij /language.",
         "bot_description": "Wyślij zdjęcie lub PDF, a przeczytam tekst na głos jako wiadomość głosową. Język wykrywam automatycznie — lub ustaw go przez /language. Stworzony, by pomagać osobom słabowidzącym.",
         "bot_short_description": "Zdjęcie/PDF → wiadomość głosowa. Automatyczne wykrywanie języka. Pomaga osobom słabowidzącym.",
+        "feedback_prompt": "📝 Napisz swoją opinię w następnej wiadomości — przekażę ją. (Możesz też użyć /feedback twój tekst.)",
+        "feedback_thanks": "🙏 Dziękujemy za opinię!",
     },
     "pt": {
         "welcome": "👋 Bem-vindo ao bot Yonchee Text2Speech!",
@@ -378,6 +392,8 @@ MESSAGES = {
         "lang_hint": "🌐 Por padrão, detecto o idioma do documento automaticamente. Para usar sempre um idioma específico, toque em /language.",
         "bot_description": "Envie uma foto ou PDF e eu leio o texto em voz alta como mensagem de voz. Detecto o idioma automaticamente — ou defina com /language. Feito para ajudar pessoas com baixa visão.",
         "bot_short_description": "Foto/PDF → mensagem de voz. Detecção automática de idioma. Ajuda pessoas com baixa visão.",
+        "feedback_prompt": "📝 Escreva seu comentário na próxima mensagem — vou repassá-lo. (Você também pode usar /feedback seu texto.)",
+        "feedback_thanks": "🙏 Obrigado pelo seu comentário!",
     },
 }
 DEFAULT_UI_LANG = "en"
@@ -407,6 +423,7 @@ WEBHOOK_URL = os.environ.get("WEBHOOK_URL", "").rstrip("/")
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
 BOT_ENV = os.environ.get("BOT_ENV", "local")
 AZURE_STORAGE_CONNECTION_STRING = os.environ.get("AZURE_STORAGE_CONNECTION_STRING", "")
+ADMIN_USER_IDS = {x.strip() for x in os.environ.get("ADMIN_USER_IDS", "").split(",") if x.strip()}
 
 
 def log_usage(user_id: int, status: str, reason: str = None, language: str = None,
@@ -436,6 +453,17 @@ def log_usage(user_id: int, status: str, reason: str = None, language: str = Non
     logger.info("UsageMetrics", extra={"custom_dimensions": dims})
 
 
+def log_feedback(user_id: int, ui_lang: str, text: str) -> None:
+    """Emit a feedback event to App Insights (searchable in traces / the workbook)."""
+    logger.info("UserFeedback", extra={"custom_dimensions": {
+        "bot_env": BOT_ENV,
+        "event_type": "feedback",
+        "user_id": user_id,
+        "language": ui_lang or "",
+        "feedback": (text or "")[:1000],
+    }})
+
+
 def classify_file_type(mime_type: str) -> str:
     if mime_type == "application/pdf":
         return "pdf"
@@ -456,6 +484,7 @@ speech_config = SpeechConfig(subscription=SPEECH_API_KEY, region=SPEECH_REGION)
 # connection string is configured (local dev) — the bot still works, just without
 # cross-restart memory.
 USER_TABLE_NAME = "users"
+FEEDBACK_TABLE_NAME = "feedback"
 STORE_PARTITION = BOT_ENV or "user"  # isolate dev/prod data within one shared table
 MAX_RECENT_LANGS = 3
 
@@ -463,6 +492,7 @@ MAX_RECENT_LANGS = 3
 class _MemoryStore:
     def __init__(self):
         self._d = {}
+        self._fb = []
 
     def get_user(self, user_id):
         return dict(self._d.get(user_id, {}))
@@ -480,14 +510,23 @@ class _MemoryStore:
         recent = [locale2] + [x for x in recent if x != locale2]
         u["recent"] = ",".join(recent[:MAX_RECENT_LANGS])
 
+    def add_feedback(self, user_id, username, ui_lang, text):
+        self._fb.append({"user_id": str(user_id), "username": username or "",
+                         "ui_lang": ui_lang or "", "text": text, "created": int(time.time() * 1000)})
+
+    def list_recent_feedback(self, limit=10):
+        return list(reversed(self._fb))[:limit]
+
 
 class _TableStore:
-    """One entity per user: PartitionKey='user', RowKey=str(user_id)."""
+    """Users in one table (PartitionKey=env, RowKey=user_id); feedback in another."""
     def __init__(self, connection_string):
         from azure.data.tables import TableServiceClient
         svc = TableServiceClient.from_connection_string(connection_string)
         svc.create_table_if_not_exists(USER_TABLE_NAME)
+        svc.create_table_if_not_exists(FEEDBACK_TABLE_NAME)
         self._client = svc.get_table_client(USER_TABLE_NAME)
+        self._fb_client = svc.get_table_client(FEEDBACK_TABLE_NAME)
 
     def get_user(self, user_id):
         from azure.core.exceptions import ResourceNotFoundError
@@ -516,6 +555,32 @@ class _TableStore:
         recent = [x for x in u.get("recent", "").split(",") if x]
         recent = [locale2] + [x for x in recent if x != locale2]
         self._upsert(user_id, recent=",".join(recent[:MAX_RECENT_LANGS]))
+
+    def add_feedback(self, user_id, username, ui_lang, text):
+        ts = int(time.time() * 1000)
+        entity = {
+            "PartitionKey": STORE_PARTITION,
+            "RowKey": f"{9999999999999 - ts}-{user_id}",  # reverse ts -> newest sorts first
+            "user_id": str(user_id),
+            "username": username or "",
+            "ui_lang": ui_lang or "",
+            "text": text,
+            "created": ts,
+        }
+        try:
+            self._fb_client.create_entity(entity)
+        except Exception as ex:
+            logger.warning(f"add_feedback failed: {ex!r}")
+
+    def list_recent_feedback(self, limit=10):
+        try:
+            items = list(self._fb_client.query_entities(
+                f"PartitionKey eq '{STORE_PARTITION}'", results_per_page=limit))
+            items.sort(key=lambda e: e.get("RowKey", ""))
+            return items[:limit]
+        except Exception as ex:
+            logger.warning(f"list_recent_feedback failed: {ex!r}")
+            return []
 
 
 def _build_user_store():
@@ -1060,6 +1125,53 @@ async def on_setlang_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
             t(update, "default_set").format(lang=f'{info["flag"]} {info["name"]}')
         )
 
+
+async def feedback_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    text = " ".join(context.args).strip() if context.args else ""
+    if text:
+        await _save_feedback(update, context, text)
+    else:
+        context.user_data["awaiting_feedback"] = True
+        await update.message.reply_text(t(update, "feedback_prompt"))
+
+
+async def _save_feedback(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str) -> None:
+    user = update.effective_user
+    ui_lang = resolve_ui_lang(update)
+    try:
+        user_store.add_feedback(user.id, user.username or user.full_name, ui_lang, text[:4000])
+    except Exception as ex:
+        logger.warning(f"store feedback failed: {ex!r}")
+    log_feedback(user.id, ui_lang, text)
+    logger.info(f"Feedback received from user {user.id}")
+    await update.message.reply_text(t(update, "feedback_thanks"))
+
+
+async def on_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Capture feedback when it's awaited; otherwise gently nudge with the help text."""
+    if context.user_data.pop("awaiting_feedback", False):
+        text = (update.message.text or "").strip()
+        if text:
+            await _save_feedback(update, context, text)
+            return
+    await update.message.reply_text(t(update, "help"))
+
+
+async def feedback_recent_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Owner-only: show the latest feedback. Enabled by the ADMIN_USER_IDS env var."""
+    if not ADMIN_USER_IDS or str(update.effective_user.id) not in ADMIN_USER_IDS:
+        await update.message.reply_text(t(update, "help"))
+        return
+    items = user_store.list_recent_feedback(10)
+    if not items:
+        await update.message.reply_text("No feedback yet.")
+        return
+    lines = [
+        f"• [{e.get('ui_lang', '?')}] @{e.get('username', '')} ({e.get('user_id', '')}): {e.get('text', '')}"
+        for e in items
+    ]
+    await update.message.reply_text(("🗒 Recent feedback:\n\n" + "\n\n".join(lines))[:4000])
+
 # --- Main entrypoint ---
 async def _set_bot_descriptions(bot) -> None:
     """Set the localized bot profile description (shown before a user taps Start)
@@ -1084,6 +1196,7 @@ async def _post_init(application) -> None:
             BotCommand("start", "Start / how it works"),
             BotCommand("help", "How to use the bot"),
             BotCommand("language", "Set audio language (or auto-detect)"),
+            BotCommand("feedback", "Send feedback / report an issue"),
         ])
     except Exception as ex:
         logger.warning(f"set_my_commands failed: {ex!r}")
@@ -1103,7 +1216,10 @@ def main() -> None:
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("language", language_command))
+    app.add_handler(CommandHandler("feedback", feedback_command))
+    app.add_handler(CommandHandler("feedback_recent", feedback_recent_command))
     app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO, handle_file))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text_message))
     app.add_handler(CallbackQueryHandler(on_setlang_callback, pattern=r"^setlang:"))
     app.add_handler(CallbackQueryHandler(on_language_callback, pattern=r"^lang:"))
 
