@@ -488,6 +488,9 @@ USER_TABLE_NAME = "users"
 FEEDBACK_TABLE_NAME = "feedback"
 STORE_PARTITION = BOT_ENV or "user"  # isolate dev/prod data within one shared table
 MAX_RECENT_LANGS = 3
+# How long a pending /feedback prompt stays "armed" (survives scale-to-zero / replica
+# switch via storage). Beyond this, a stray text message won't be captured as feedback.
+FEEDBACK_WAIT_WINDOW_SEC = 3600
 
 
 class _MemoryStore:
@@ -511,6 +514,13 @@ class _MemoryStore:
         recent = [locale2] + [x for x in recent if x != locale2]
         u["recent"] = ",".join(recent[:MAX_RECENT_LANGS])
 
+    def set_awaiting_feedback(self, user_id, on):
+        u = self._d.setdefault(user_id, {})
+        if on:
+            u["awaiting_fb"] = int(time.time())
+        else:
+            u.pop("awaiting_fb", None)
+
     def add_feedback(self, user_id, username, ui_lang, text):
         self._fb.append({"user_id": str(user_id), "username": username or "",
                          "ui_lang": ui_lang or "", "text": text, "created": int(time.time() * 1000)})
@@ -533,7 +543,8 @@ class _TableStore:
         from azure.core.exceptions import ResourceNotFoundError
         try:
             e = self._client.get_entity(STORE_PARTITION, str(user_id))
-            return {"default_lang": e.get("default_lang") or "", "recent": e.get("recent") or ""}
+            return {"default_lang": e.get("default_lang") or "", "recent": e.get("recent") or "",
+                    "awaiting_fb": e.get("awaiting_fb") or 0}
         except ResourceNotFoundError:
             return {}
         except Exception as ex:
@@ -556,6 +567,10 @@ class _TableStore:
         recent = [x for x in u.get("recent", "").split(",") if x]
         recent = [locale2] + [x for x in recent if x != locale2]
         self._upsert(user_id, recent=",".join(recent[:MAX_RECENT_LANGS]))
+
+    def set_awaiting_feedback(self, user_id, on):
+        # Persisted so a /feedback prompt survives scale-to-zero and replica switches.
+        self._upsert(user_id, awaiting_fb=int(time.time()) if on else 0)
 
     def add_feedback(self, user_id, username, ui_lang, text):
         ts = int(time.time() * 1000)
@@ -1207,7 +1222,10 @@ async def feedback_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if text:
         await _save_feedback(update, context, text)
     else:
-        context.user_data["awaiting_feedback"] = True
+        try:
+            user_store.set_awaiting_feedback(update.effective_user.id, True)
+        except Exception as ex:
+            logger.warning(f"set_awaiting_feedback failed: {ex!r}")
         await update.message.reply_text(t(update, "feedback_prompt"))
 
 
@@ -1224,10 +1242,26 @@ async def _save_feedback(update: Update, context: ContextTypes.DEFAULT_TYPE, tex
 
 
 async def on_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Capture feedback when it's awaited; otherwise gently nudge with the help text."""
-    if context.user_data.pop("awaiting_feedback", False):
+    """Capture feedback when it's awaited; otherwise gently nudge with the help text.
+
+    The "awaiting" flag lives in storage (not in-memory user_data) so it survives
+    scale-to-zero and webhook routing to a different replica between the /feedback
+    prompt and the user's reply.
+    """
+    user_id = update.effective_user.id
+    awaiting = False
+    try:
+        aw = int(user_store.get_user(user_id).get("awaiting_fb") or 0)
+        awaiting = aw > 0 and (int(time.time()) - aw) < FEEDBACK_WAIT_WINDOW_SEC
+    except Exception as ex:
+        logger.warning(f"awaiting_fb check failed: {ex!r}")
+    if awaiting:
         text = (update.message.text or "").strip()
         if text:
+            try:
+                user_store.set_awaiting_feedback(user_id, False)
+            except Exception as ex:
+                logger.warning(f"clear awaiting_fb failed: {ex!r}")
             await _save_feedback(update, context, text)
             return
     await update.message.reply_text(t(update, "help"))
