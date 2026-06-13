@@ -1365,16 +1365,30 @@ async def _post_init(application) -> None:
     """Register the slash-command menu so /language is discoverable, and set the
     bot descriptions in the background (they aren't needed to serve requests, so
     we don't block cold-start readiness on them)."""
-    from telegram import BotCommand
+    from telegram import BotCommand, BotCommandScopeChat
+    public_cmds = [
+        BotCommand("start", "Start / how it works"),
+        BotCommand("help", "How to use the bot"),
+        BotCommand("language", "Set audio language (or auto-detect)"),
+        BotCommand("feedback", "Send feedback / report an issue"),
+    ]
     try:
-        await application.bot.set_my_commands([
-            BotCommand("start", "Start / how it works"),
-            BotCommand("help", "How to use the bot"),
-            BotCommand("language", "Set audio language (or auto-detect)"),
-            BotCommand("feedback", "Send feedback / report an issue"),
-        ])
+        await application.bot.set_my_commands(public_cmds)
     except Exception as ex:
         logger.warning(f"set_my_commands failed: {ex!r}")
+    # Admins also see the owner-only commands in their personal menu (scoped by chat),
+    # so they're discoverable without exposing them to regular users.
+    admin_cmds = public_cmds + [
+        BotCommand("feedback_recent", "Admin: last 10 feedback"),
+        BotCommand("feedback_stats", "Admin: feedback stats"),
+        BotCommand("feedback_digest", "Admin: AI improvement digest"),
+    ]
+    for uid in ADMIN_USER_IDS:
+        try:
+            await application.bot.set_my_commands(
+                admin_cmds, scope=BotCommandScopeChat(chat_id=int(uid)))
+        except Exception as ex:
+            logger.warning(f"set_my_commands (admin {uid}) failed: {ex!r}")
     asyncio.create_task(_set_bot_descriptions(application.bot))
 
 
