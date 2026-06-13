@@ -5,5 +5,6 @@ azure-data-tables==12.5.0
 python-dotenv==1.0.1
 setuptools<81
 opencensus-ext-azure==1.1.9
+anthropic>=0.39,<1.0
 
 # System requirement: ffmpeg must be installed and available in PATH

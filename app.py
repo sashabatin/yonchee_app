@@ -427,6 +427,11 @@ ADMIN_USER_IDS = {x.strip() for x in os.environ.get("ADMIN_USER_IDS", "").split(
 OCR_FALLBACK = os.environ.get("OCR_FALLBACK", "tesseract").strip().lower()  # tesseract | llm
 
 
+def _is_admin(update) -> bool:
+    """True only for user IDs listed in the ADMIN_USER_IDS env var."""
+    return bool(ADMIN_USER_IDS) and str(update.effective_user.id) in ADMIN_USER_IDS
+
+
 def log_usage(user_id: int, status: str, reason: str = None, language: str = None,
               ocr_pages: int = None, tts_chars: int = None, file_type: str = None,
               file_size_kb: int = None, duration_ms: int = None) -> None:
@@ -1269,7 +1274,7 @@ async def on_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 async def feedback_recent_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Owner-only: show the latest feedback. Enabled by the ADMIN_USER_IDS env var."""
-    if not ADMIN_USER_IDS or str(update.effective_user.id) not in ADMIN_USER_IDS:
+    if not _is_admin(update):
         await update.message.reply_text(t(update, "help"))
         return
     items = user_store.list_recent_feedback(10)
@@ -1281,6 +1286,63 @@ async def feedback_recent_command(update: Update, context: ContextTypes.DEFAULT_
         for e in items
     ]
     await update.message.reply_text(("🗒 Recent feedback:\n\n" + "\n\n".join(lines))[:4000])
+
+
+async def feedback_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Owner-only: aggregate counts over stored feedback (no LLM, instant)."""
+    if not _is_admin(update):
+        await update.message.reply_text(t(update, "help"))
+        return
+    items = user_store.list_recent_feedback(500)
+    if not items:
+        await update.message.reply_text("No feedback yet.")
+        return
+    by_lang = defaultdict(int)
+    by_day = defaultdict(int)
+    users = set()
+    for e in items:
+        users.add(str(e.get("user_id", "")))
+        by_lang[e.get("ui_lang") or "?"] += 1
+        created = e.get("created")
+        if created:
+            try:
+                day = time.strftime("%Y-%m-%d", time.gmtime(int(created) / 1000))
+                by_day[day] += 1
+            except (ValueError, TypeError, OSError):
+                pass
+    lang_line = ", ".join(f"{k}:{v}" for k, v in sorted(by_lang.items(), key=lambda x: -x[1]))
+    day_lines = "\n".join(f"  {d}: {c}" for d, c in sorted(by_day.items(), reverse=True)[:7])
+    msg = (
+        f"📊 Feedback stats\n\n"
+        f"Total: {len(items)}\n"
+        f"Unique users: {len(users)}\n\n"
+        f"By UI language: {lang_line}\n\n"
+        f"By day (last 7):\n{day_lines or '  —'}"
+    )
+    await update.message.reply_text(msg[:4000])
+
+
+async def feedback_digest_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Owner-only: cluster feedback into prioritized improvement tasks via Claude."""
+    if not _is_admin(update):
+        await update.message.reply_text(t(update, "help"))
+        return
+    items = user_store.list_recent_feedback(300)
+    await update.message.reply_text("⏳ Готовлю разбор фидбека…")
+    import feedback_ai
+    try:
+        digest = await asyncio.to_thread(feedback_ai.generate_digest, items)
+    except Exception as ex:
+        logger.warning(f"feedback_digest failed: {ex!r}")
+        digest = None
+    if digest is None:
+        await update.message.reply_text(
+            "⚠️ Разбор недоступен: не настроен ANTHROPIC_API_KEY (или сбой API). "
+            "Сырой фидбек смотри через /feedback_recent."
+        )
+        return
+    for i in range(0, len(digest), 4000):
+        await update.message.reply_text(digest[i:i + 4000])
 
 # --- Main entrypoint ---
 async def _set_bot_descriptions(bot) -> None:
@@ -1328,6 +1390,8 @@ def main() -> None:
     app.add_handler(CommandHandler("language", language_command))
     app.add_handler(CommandHandler("feedback", feedback_command))
     app.add_handler(CommandHandler("feedback_recent", feedback_recent_command))
+    app.add_handler(CommandHandler("feedback_stats", feedback_stats_command))
+    app.add_handler(CommandHandler("feedback_digest", feedback_digest_command))
     app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO, handle_file))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text_message))
     app.add_handler(CallbackQueryHandler(on_setlang_callback, pattern=r"^setlang:"))
