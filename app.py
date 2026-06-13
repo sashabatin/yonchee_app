@@ -9,6 +9,7 @@ import platform
 import time
 import html
 from collections import defaultdict
+from typing import NamedTuple, Optional
 from dotenv import load_dotenv
 
 try:
@@ -919,6 +920,54 @@ def build_language_keyboard(update: Update, detected_locale, recent=None) -> Inl
     return InlineKeyboardMarkup(rows)
 
 
+class OcrResult(NamedTuple):
+    """Result of OCR + content-language detection — the bot's core extraction
+    step decoupled from Telegram, so it can be reused (e.g. by the qa toolkit)."""
+    text: str                   # normalized OCR text ('' when none found)
+    ocr_pages: Optional[int]    # page count (None for the fallback OCR engine)
+    locale2: Optional[str]      # detected content language, or None
+    confidence: float           # detection confidence (text-length-weighted)
+    coverage: float             # fraction of text in the dominant language
+    script_lang: Optional[str]  # language inferred from a distinct script, if any
+    used_fallback: bool         # True when the Tesseract/LLM fallback engine ran
+
+
+def extract_text(file_path: str, file_type: str, pinned_lang: str = None) -> OcrResult:
+    """Run OCR and detect the content language for a local file.
+
+    Mirrors what the bot does in handle_file, without Telegram coupling:
+    pinned_lang in FALLBACK_LANGS routes to the fallback OCR engine (no
+    detection); otherwise Azure Read extracts the text and the language is
+    inferred by script first, then by Azure's per-line detection.
+    """
+    if pinned_lang in FALLBACK_LANGS:
+        raw = run_fallback_ocr(file_path, file_type, pinned_lang)
+        return OcrResult(normalize_ocr_text(raw or ""), None, None, 0.0, 0.0, None, True)
+
+    with open(file_path, "rb") as f:
+        poller = doc_client.begin_analyze_document(
+            "prebuilt-read", f, features=[DocumentAnalysisFeature.LANGUAGES]
+        )
+        result = poller.result()
+    ocr_pages = len(result.pages)
+    extracted_text = ""
+    for page in result.pages:
+        for line in page.lines:
+            extracted_text += line.content + "\n"
+    normalized_text = normalize_ocr_text(extracted_text)
+    if not normalized_text.strip():
+        return OcrResult("", ocr_pages, None, 0.0, 0.0, None, False)
+
+    script_lang = detect_script_language(normalized_text)
+    if script_lang and script_lang in VOICE_MAP:
+        # A distinct script is authoritative — Azure's per-line guess is
+        # unreliable for these (e.g. Georgian was detected as Thai).
+        locale2, conf, coverage = script_lang, 1.0, 1.0
+    else:
+        locale2, conf, coverage = detect_dominant_language(result)
+    return OcrResult(normalized_text, ocr_pages, locale2, conf, coverage, script_lang, False)
+
+
 async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Entry point: download → OCR (with language detection) → auto-synthesize if
     the language is confidently detected, otherwise show the language picker."""
@@ -959,8 +1008,8 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         # Fallback OCR for languages Azure can't extract (e.g. Georgian), reached
         # by pinning that language via /language. Engine chosen by OCR_FALLBACK.
         if default_lang in FALLBACK_LANGS:
-            raw = await asyncio.to_thread(run_fallback_ocr, file_path, file_type, default_lang)
-            normalized_text = normalize_ocr_text(raw or "")
+            ocr = await asyncio.to_thread(extract_text, file_path, file_type, default_lang)
+            normalized_text = ocr.text
             ocr_ms = round((time.monotonic() - t0) * 1000)
             if not normalized_text.strip():
                 await status_message.edit_text(t(update, "no_text"))
@@ -969,7 +1018,7 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                           file_type=file_type, file_size_kb=file_size_kb, duration_ms=ocr_ms)
                 return
             context.user_data["ocr_job"] = {
-                "text": normalized_text, "ocr_pages": None, "ocr_ms": ocr_ms,
+                "text": normalized_text, "ocr_pages": ocr.ocr_pages, "ocr_ms": ocr_ms,
                 "file_type": file_type, "file_size_kb": file_size_kb,
             }
             info = VOICE_MAP[default_lang]
@@ -980,17 +1029,9 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             await synthesize_and_send(update, context, default_lang, status_message=None)
             return
 
-        with open(file_path, "rb") as f:
-            poller = doc_client.begin_analyze_document(
-                "prebuilt-read", f, features=[DocumentAnalysisFeature.LANGUAGES]
-            )
-            result = poller.result()
-        ocr_pages = len(result.pages)
-        extracted_text = ""
-        for page in result.pages:
-            for line in page.lines:
-                extracted_text += line.content + "\n"
-        normalized_text = normalize_ocr_text(extracted_text)
+        ocr = extract_text(file_path, file_type)
+        normalized_text = ocr.text
+        ocr_pages = ocr.ocr_pages
         ocr_ms = round((time.monotonic() - t0) * 1000)
 
         if not normalized_text.strip():
@@ -1001,14 +1042,8 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                       file_type=file_type, file_size_kb=file_size_kb, duration_ms=ocr_ms)
             return
 
-        script_lang = detect_script_language(normalized_text)
-        if script_lang and script_lang in VOICE_MAP:
-            # A distinct script is authoritative — Azure's per-line language
-            # guess is unreliable for these (e.g. Georgian was detected as Thai).
-            locale2, conf, coverage = script_lang, 1.0, 1.0
-        else:
-            locale2, conf, coverage = detect_dominant_language(result)
-        logger.info(f"User {user_id}: script={script_lang} lang={locale2} conf={conf:.2f} coverage={coverage:.2f}")
+        locale2, conf, coverage = ocr.locale2, ocr.confidence, ocr.coverage
+        logger.info(f"User {user_id}: script={ocr.script_lang} lang={locale2} conf={conf:.2f} coverage={coverage:.2f}")
         context.user_data["ocr_job"] = {
             "text": normalized_text, "ocr_pages": ocr_pages, "ocr_ms": ocr_ms,
             "file_type": file_type, "file_size_kb": file_size_kb,
@@ -1056,6 +1091,27 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             pass
         remove_temp_file(file_path)
 
+def synthesize_to_file(text: str, locale2: str, out_path: str):
+    """Synthesize `text` to an MP3 at out_path using the voice for locale2
+    (English fallback). Returns the Azure SpeechSynthesisResult so callers can
+    inspect result.reason / cancellation_details. No Telegram coupling, so it's
+    reusable by the qa toolkit."""
+    info = VOICE_MAP.get(locale2) or VOICE_MAP["en"]
+    ssml = f"""
+<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="{info['lang_code']}">
+  <voice name="{info['voice']}">
+    {escape_ssml(text)}
+  </voice>
+</speak>
+"""
+    synthesizer = SpeechSynthesizer(
+        speech_config=speech_config, audio_config=AudioConfig(filename=out_path)
+    )
+    result = synthesizer.speak_ssml_async(ssml).get()
+    del synthesizer
+    return result
+
+
 async def synthesize_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE,
                               locale2: str, status_message=None) -> None:
     """Synthesize the stored OCR text into a voice message in the chosen language.
@@ -1069,8 +1125,6 @@ async def synthesize_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
 
     info = VOICE_MAP.get(locale2) or VOICE_MAP["en"]
-    lang_code = info["lang_code"]
-    voice = info["voice"]
     lang_label = f'{info["flag"]} {info["name"]}'
     normalized_text = job["text"]
     ocr_pages = job.get("ocr_pages")
@@ -1098,19 +1152,8 @@ async def synthesize_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE
                 chat_id, t(update, "generating_audio").format(lang=lang_label)
             )
 
-        escaped_text = escape_ssml(normalized_text)
-        ssml = f"""
-<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="{lang_code}">
-  <voice name="{voice}">
-    {escaped_text}
-  </voice>
-</speak>
-"""
         audio_path = f"{tempfile.mktemp()}.mp3"
-        audio_config = AudioConfig(filename=audio_path)
-        synthesizer_with_file = SpeechSynthesizer(speech_config=speech_config, audio_config=audio_config)
-        result = synthesizer_with_file.speak_ssml_async(ssml).get()
-        del synthesizer_with_file
+        result = synthesize_to_file(normalized_text, locale2, audio_path)
 
         if result.reason != ResultReason.SynthesizingAudioCompleted:
             error_message = "Speech synthesis failed."
