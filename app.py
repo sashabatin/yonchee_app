@@ -424,6 +424,7 @@ WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
 BOT_ENV = os.environ.get("BOT_ENV", "local")
 AZURE_STORAGE_CONNECTION_STRING = os.environ.get("AZURE_STORAGE_CONNECTION_STRING", "")
 ADMIN_USER_IDS = {x.strip() for x in os.environ.get("ADMIN_USER_IDS", "").split(",") if x.strip()}
+OCR_FALLBACK = os.environ.get("OCR_FALLBACK", "tesseract").strip().lower()  # tesseract | llm
 
 
 def log_usage(user_id: int, status: str, reason: str = None, language: str = None,
@@ -652,7 +653,7 @@ SCRIPT_RANGES = [
 
 # Languages shown as buttons in the manual picker (target markets). Auto-detect
 # can still pick any language in VOICE_MAP beyond this list.
-MENU_LANGS = ["en", "uk", "ru", "es", "de", "fr", "pl", "pt", "it", "nl", "tr", "kk"]
+MENU_LANGS = ["en", "uk", "ru", "es", "de", "fr", "pl", "pt", "it", "nl", "tr", "kk", "ka", "hy"]
 
 # Auto-proceed to synthesis only when detection is at least this confident and
 # the dominant language covers at least this fraction of the text; else we ask.
@@ -720,6 +721,55 @@ def detect_script_language(text):
     if counts[best] / letters >= 0.5:
         return best
     return None
+
+
+# --- Fallback OCR for languages Azure Read can't extract (e.g. Georgian) ---
+FALLBACK_LANGS = {"ka", "hy"}        # routed to the fallback OCR engine
+TESSERACT_LANG = {"ka": "kat", "hy": "hye"}
+
+
+def run_tesseract_ocr(file_path, file_type, locale2):
+    """OCR via local Tesseract (Georgian/Armenian language data in the image)."""
+    import subprocess
+    import glob
+    lang = TESSERACT_LANG.get(locale2, "eng")
+    images = [file_path]
+    tmp_imgs = []
+    if file_type == "pdf":
+        prefix = tempfile.mktemp()
+        r = subprocess.run(["pdftoppm", "-r", "300", "-png", file_path, prefix],
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if r.returncode != 0:
+            logger.error(f"pdftoppm error: {r.stderr.decode(errors='ignore')[:200]}")
+            raise RuntimeError("PDF rasterization failed")
+        tmp_imgs = sorted(glob.glob(prefix + "*.png"))
+        images = tmp_imgs or [file_path]
+    texts = []
+    try:
+        for img in images:
+            r = subprocess.run(["tesseract", img, "stdout", "-l", lang],
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            if r.returncode != 0:
+                logger.warning(f"tesseract error: {r.stderr.decode(errors='ignore')[:200]}")
+                continue
+            texts.append(r.stdout.decode("utf-8", errors="ignore"))
+    finally:
+        for p in tmp_imgs:
+            remove_temp_file(p)
+    return "\n".join(texts)
+
+
+def run_llm_ocr(file_path, file_type, locale2):
+    # Next prototype step: Azure OpenAI gpt-4o vision.
+    logger.warning("OCR_FALLBACK=llm but LLM OCR is not configured yet.")
+    return ""
+
+
+def run_fallback_ocr(file_path, file_type, locale2):
+    """Run the configured fallback OCR engine for an Azure-unsupported language."""
+    if OCR_FALLBACK == "llm":
+        return run_llm_ocr(file_path, file_type, locale2)
+    return run_tesseract_ocr(file_path, file_type, locale2)
 
 SUPPORTED_MIME = {
     "image/jpeg", "image/png", "image/tiff", "image/bmp",
@@ -879,6 +929,34 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         tg_file = await file.get_file()
         file_path = tempfile.mktemp()
         await tg_file.download_to_drive(file_path)
+
+        prefs = user_store.get_user(user_id)
+        default_lang = (prefs.get("default_lang") or "").strip()
+
+        # Fallback OCR for languages Azure can't extract (e.g. Georgian), reached
+        # by pinning that language via /language. Engine chosen by OCR_FALLBACK.
+        if default_lang in FALLBACK_LANGS:
+            raw = await asyncio.to_thread(run_fallback_ocr, file_path, file_type, default_lang)
+            normalized_text = normalize_ocr_text(raw or "")
+            ocr_ms = round((time.monotonic() - t0) * 1000)
+            if not normalized_text.strip():
+                await status_message.edit_text(t(update, "no_text"))
+                await update.message.reply_text(t(update, "help"))
+                log_usage(user_id, status="failure", reason="no_text_fallback",
+                          file_type=file_type, file_size_kb=file_size_kb, duration_ms=ocr_ms)
+                return
+            context.user_data["ocr_job"] = {
+                "text": normalized_text, "ocr_pages": None, "ocr_ms": ocr_ms,
+                "file_type": file_type, "file_size_kb": file_size_kb,
+            }
+            info = VOICE_MAP[default_lang]
+            await status_message.edit_text(
+                t(update, "using_default").format(lang=f'{info["flag"]} {info["name"]}')
+            )
+            stop_typing.set()
+            await synthesize_and_send(update, context, default_lang, status_message=None)
+            return
+
         with open(file_path, "rb") as f:
             poller = doc_client.begin_analyze_document(
                 "prebuilt-read", f, features=[DocumentAnalysisFeature.LANGUAGES]
@@ -913,8 +991,6 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             "file_type": file_type, "file_size_kb": file_size_kb,
         }
 
-        prefs = user_store.get_user(user_id)
-        default_lang = (prefs.get("default_lang") or "").strip()
         if default_lang in VOICE_MAP:
             # User pinned a language via /language — skip detection and the menu.
             info = VOICE_MAP[default_lang]
