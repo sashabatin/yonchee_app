@@ -586,7 +586,10 @@ class _TableStore:
             "username": username or "",
             "ui_lang": ui_lang or "",
             "text": text,
-            "created": ts,
+            # Stored as a string: epoch ms exceeds Int32 and the SDK won't auto-promote
+            # to Int64 (it raises), while Int64 reads back as an EntityProperty wrapper.
+            # A numeric string sidesteps both and int()s cleanly for stats.
+            "created": str(ts),
         }
         try:
             self._fb_client.create_entity(entity)
