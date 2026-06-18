@@ -325,6 +325,79 @@
     },
     {
       "type": 1,
+      "content": { "json": "## 🚀 Growth / Support funnel" },
+      "name": "header-growth"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let g = traces\n| where message == 'GrowthMetrics'\n| where tostring(customDimensions.bot_env) == '{Environment}'\n| extend e = tostring(customDimensions.event_type);\nlet views = todouble(coalesce(toscalar(g | summarize countif(e == 'support_view')), 0));\nlet pack_clicks = todouble(coalesce(toscalar(g | summarize countif(e == 'support_pack_click')), 0));\nlet created = todouble(coalesce(toscalar(g | summarize countif(e == 'support_request_created')), 0));\nlet granted = todouble(coalesce(toscalar(g | summarize countif(e == 'support_bonus_granted')), 0));\nlet rejected = todouble(coalesce(toscalar(g | summarize countif(e == 'support_request_rejected')), 0));\nunion\n(print Metric = 'Support views', Value = views),\n(print Metric = 'Pack clicks', Value = pack_clicks),\n(print Metric = 'Requests created', Value = created),\n(print Metric = 'Bonuses granted', Value = granted),\n(print Metric = 'Requests rejected', Value = rejected),\n(print Metric = 'View -> click %', Value = iff(views == 0, 0.0, round(100.0 * pack_clicks / views, 1))),\n(print Metric = 'Created -> granted %', Value = iff(created == 0, 0.0, round(100.0 * granted / created, 1)))",
+        "size": 4,
+        "title": "Support funnel totals",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "tiles",
+        "tileSettings": {
+          "titleContent": { "columnMatch": "Metric", "formatter": 1 },
+          "leftContent": { "columnMatch": "Value", "formatter": 12, "formatOptions": { "palette": "auto" }, "numberFormat": { "unit": 0, "options": { "style": "decimal", "maximumFractionDigits": 1 } } },
+          "showBorder": true
+        }
+      },
+      "name": "support-funnel-tiles"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "traces\n| where message == 'GrowthMetrics'\n| where tostring(customDimensions.bot_env) == '{Environment}'\n| extend Event = tostring(customDimensions.event_type)\n| where Event in ('support_view', 'support_pack_click', 'support_request_created', 'support_bonus_granted', 'support_request_rejected')\n| summarize Count = count() by Event\n| order by Count desc",
+        "size": 0,
+        "title": "Support events breakdown",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "barchart"
+      },
+      "customWidth": "50",
+      "name": "support-events-breakdown"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let g = traces\n| where message == 'GrowthMetrics'\n| where tostring(customDimensions.bot_env) == '{Environment}'\n| extend e = tostring(customDimensions.event_type)\n| summarize prompts = countif(e == 'precost_prompt_shown'), confirms = countif(e == 'precost_confirm'), cancels = countif(e == 'precost_cancel');\nlet prompts = todouble(coalesce(toscalar(g | project prompts), 0));\nlet confirms = todouble(coalesce(toscalar(g | project confirms), 0));\nlet cancels = todouble(coalesce(toscalar(g | project cancels), 0));\nunion\n(print Metric = 'Pre-cost prompts', Value = prompts),\n(print Metric = 'Confirmed', Value = confirms),\n(print Metric = 'Canceled', Value = cancels),\n(print Metric = 'Confirm rate %', Value = iff(prompts == 0, 0.0, round(100.0 * confirms / prompts, 1))),\n(print Metric = 'Cancel rate %', Value = iff(prompts == 0, 0.0, round(100.0 * cancels / prompts, 1)))",
+        "size": 4,
+        "title": "Pre-cost confirmation",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "tiles",
+        "tileSettings": {
+          "titleContent": { "columnMatch": "Metric", "formatter": 1 },
+          "leftContent": { "columnMatch": "Value", "formatter": 12, "formatOptions": { "palette": "auto" }, "numberFormat": { "unit": 0, "options": { "style": "decimal", "maximumFractionDigits": 1 } } },
+          "showBorder": true
+        }
+      },
+      "customWidth": "50",
+      "name": "precost-tiles"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "traces\n| where message == 'GrowthMetrics'\n| where tostring(customDimensions.bot_env) == '{Environment}'\n| extend Event = tostring(customDimensions.event_type)\n| where Event in ('onboarding_start', 'support_view', 'support_pack_click', 'support_bonus_granted', 'precost_prompt_shown', 'precost_confirm', 'precost_cancel')\n| summarize Count = count() by bin(timestamp, 1d), Event\n| order by timestamp asc",
+        "size": 0,
+        "title": "Growth/support events over time",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "visualization": "timechart"
+      },
+      "name": "growth-events-time"
+    },
+    {
+      "type": 1,
       "content": { "json": "## 🖥 Infrastructure (Azure Monitor metrics)\n\nThese charts read platform metrics from the Container App resource. Pick which app to show with the **Container App** selector below (separate from the Environment filter above)." },
       "name": "header-infra"
     },

@@ -28,6 +28,7 @@ custom dimensions:
 | `file_type`     | `pdf` / `image`                                                |
 | `file_size_kb`  | uploaded file size in KB                                       |
 | `duration_ms`   | processing time (OCR+TTS+upload), excludes cold start          |
+| `cost_credits`  | estimated credits spent for this request (1..N)                |
 | `user_id`       | Telegram user id                                               |
 
 These land in the `traces` table under `customDimensions`. Both dev and prod
@@ -37,6 +38,28 @@ send to the **same** Application Insights resource (same
 > Records written before this telemetry was added have no `status` field; the
 > dashboard treats a missing `status` as success (via `status != 'failure'`) so
 > historical data still counts.
+
+## Growth + Monetization telemetry (new)
+
+The bot now also emits support and pre-cost events via `log_growth_event()`
+into `traces/customDimensions`:
+
+| `event_type`               | Meaning |
+| -------------------------- | ------- |
+| `onboarding_start`         | `/start` opened (with optional deep-link `source`) |
+| `support_view`             | support screen opened |
+| `support_pack_click`       | user clicked a support pack |
+| `support_custom_click`     | user clicked custom amount |
+| `support_request_created`  | request created in admin-stub mode |
+| `support_bonus_granted`    | bonus was granted (instant or admin approval) |
+| `support_request_rejected` | admin rejected request |
+| `precost_prompt_shown`     | heavy-file pre-cost prompt shown |
+| `precost_confirm`          | user accepted pre-cost prompt |
+| `precost_cancel`           | user cancelled pre-cost prompt |
+
+Recommendation: extend the existing workbook instead of creating a second one.
+Keep one dashboard with a new "Growth/Support funnel" section (easier to
+compare conversion against reliability/cost in the same time window).
 
 ## Cost estimate assumptions
 

@@ -8,6 +8,7 @@ import sys
 import platform
 import time
 import html
+from datetime import datetime, timedelta
 from collections import defaultdict
 from typing import NamedTuple, Optional
 from dotenv import load_dotenv
@@ -129,6 +130,28 @@ MESSAGES = {
         "bot_short_description": "Photo/PDF → voice message. Automatic language detection. Helps people with low vision.",
         "feedback_prompt": "📝 Please type your feedback in the next message — I'll pass it on. (You can also use /feedback your text.)",
         "feedback_thanks": "🙏 Thank you for your feedback!",
+        "support_menu": "💙 Support Yonchee\n\nChoose a coffee cup pack to get bonus requests:",
+        "support_pack_1": "☕ One cup · +50",
+        "support_pack_2": "☕☕ Two cups · +150",
+        "support_pack_3": "☕☕☕ Three cups · +300",
+        "support_custom_button": "💰 Custom amount",
+        "support_custom": "💡 Custom amount flow is next. For now, use coffee cup packs.",
+        "support_bonus_activated": "✅ Bonus activated: +{bonus} requests until {bonus_until}.",
+        "support_payment_pending": "⏳ Payment simulation is waiting for admin approval. You will be notified after review.",
+        "support_request_rejected": "❌ Support request was not approved. You can try again later.",
+        "precost_prompt": "⚠️ This file may consume about {cost} requests due to size/type. Continue?",
+        "precost_continue_button": "✅ Continue",
+        "precost_cancel_button": "✖️ Cancel",
+        "precost_cancelled": "Canceled. File processing was not started.",
+        "limits_status": "📊 Limits\n\nFree today: {free_left}/{free_total}\nBonus credits: {bonus_left}\nBonus valid until: {bonus_until}",
+        "limit_reached": "⚠️ Today's free limit is exhausted and bonus credits are empty. Please come back tomorrow or support the project for extra requests.",
+        "mission_intro": "☕ Funding accessibility\n\nYonchee was created to help people who find reading difficult. The name is connected to Ivan (Yonchee), whose eyesight worsened significantly in his youth, and that became the starting point for this product idea.",
+        "mission_short_audio": "Yonchee helps people who find reading difficult by turning photos and PDFs into voice messages inside Telegram.",
+        "onboarding_start_button": "🚀 Start",
+        "onboarding_listen_button": "🔊 Listen to mission",
+        "onboarding_support_button": "💙 How to support",
+        "onboarding_started": "Great. Send a photo or PDF, and I'll turn the text into a voice message.",
+        "mission_audio_error": "I couldn't generate mission audio right now. Please try again in a bit.",
     },
     "ru": {
         "welcome": "👋 Добро пожаловать в бот Yonchee Text2Speech!",
@@ -167,6 +190,28 @@ MESSAGES = {
         "bot_short_description": "Фото/PDF → голосовое сообщение. Автоопределение языка. Помогает людям со слабым зрением.",
         "feedback_prompt": "📝 Напишите ваш отзыв следующим сообщением — я его передам. (Можно и так: /feedback ваш текст.)",
         "feedback_thanks": "🙏 Спасибо за отзыв!",
+        "support_menu": "💙 Поддержать Yonchee\n\nВыберите пакет «чашка кофе», чтобы получить бонусные запросы:",
+        "support_pack_1": "☕ Одна чашка · +50",
+        "support_pack_2": "☕☕ Две чашки · +150",
+        "support_pack_3": "☕☕☕ Три чашки · +300",
+        "support_custom_button": "💰 Своя сумма",
+        "support_custom": "💡 Поток «своя сумма» будет следующим шагом. Пока используйте пакеты «чашка кофе».",
+        "support_bonus_activated": "✅ Бонус активирован: +{bonus} запросов до {bonus_until}.",
+        "support_payment_pending": "⏳ Имитация оплаты отправлена на апрув администратору. После проверки вы получите уведомление.",
+        "support_request_rejected": "❌ Запрос поддержки не был одобрен. Попробуйте позже.",
+        "precost_prompt": "⚠️ Из-за размера/типа этот файл может списать около {cost} запросов. Продолжить?",
+        "precost_continue_button": "✅ Продолжить",
+        "precost_cancel_button": "✖️ Отмена",
+        "precost_cancelled": "Отменено. Обработка файла не запускалась.",
+        "limits_status": "📊 Лимиты\n\nБесплатно сегодня: {free_left}/{free_total}\nБонусные запросы: {bonus_left}\nБонус действует до: {bonus_until}",
+        "limit_reached": "⚠️ На сегодня бесплатный лимит исчерпан и бонусные запросы закончились. Возвращайтесь завтра или поддержите проект для дополнительных запросов.",
+        "mission_intro": "☕ Финансирование доступности\n\nYonchee создан, чтобы помогать людям, которым сложно читать. Название связано с Иваном (Yonchee): в юности у него значительно ухудшилось зрение, и это стало отправной точкой идеи продукта.",
+        "mission_short_audio": "Yonchee помогает людям, которым сложно читать, превращая фото и PDF в голосовые сообщения внутри Telegram.",
+        "onboarding_start_button": "🚀 Начать",
+        "onboarding_listen_button": "🔊 Прослушать миссию",
+        "onboarding_support_button": "💙 Как поддержать",
+        "onboarding_started": "Отлично. Отправьте фото или PDF, и я превращу текст в голосовое сообщение.",
+        "mission_audio_error": "Сейчас не удалось сгенерировать аудио миссии. Попробуйте чуть позже.",
     },
     "uk": {
         "welcome": "👋 Ласкаво просимо до бота Yonchee Text2Speech!",
@@ -205,6 +250,19 @@ MESSAGES = {
         "bot_short_description": "Фото/PDF → голосове повідомлення. Автовизначення мови. Допомагає людям зі слабким зором.",
         "feedback_prompt": "📝 Напишіть ваш відгук наступним повідомленням — я його передам. (Можна й так: /feedback ваш текст.)",
         "feedback_thanks": "🙏 Дякуємо за відгук!",
+        "support_menu": "💙 Підтримати Yonchee\n\nОберіть пакет «чашка кави», щоб отримати бонусні запити:",
+        "support_pack_1": "☕ Одна чашка · +50",
+        "support_pack_2": "☕☕ Дві чашки · +150",
+        "support_pack_3": "☕☕☕ Три чашки · +300",
+        "support_custom_button": "💰 Своя сума",
+        "support_custom": "💡 Потік «своя сума» буде наступним кроком. Поки використовуйте пакети «чашка кави».",
+        "support_bonus_activated": "✅ Бонус активовано: +{bonus} запитів до {bonus_until}.",
+        "support_payment_pending": "⏳ Імітацію оплати відправлено на апрув адміну. Після перевірки ви отримаєте повідомлення.",
+        "support_request_rejected": "❌ Запит підтримки не було схвалено. Спробуйте пізніше.",
+        "precost_prompt": "⚠️ Через розмір/тип цей файл може списати близько {cost} запитів. Продовжити?",
+        "precost_continue_button": "✅ Продовжити",
+        "precost_cancel_button": "✖️ Скасувати",
+        "precost_cancelled": "Скасовано. Обробку файлу не запущено.",
     },
     "es": {
         "welcome": "👋 ¡Bienvenido al bot Yonchee Text2Speech!",
@@ -243,6 +301,19 @@ MESSAGES = {
         "bot_short_description": "Foto/PDF → mensaje de voz. Detección automática de idioma. Ayuda a personas con baja visión.",
         "feedback_prompt": "📝 Escribe tu comentario en el siguiente mensaje — lo transmitiré. (También puedes usar /feedback tu texto.)",
         "feedback_thanks": "🙏 ¡Gracias por tu comentario!",
+        "support_menu": "💙 Apoyar Yonchee\n\nElige un paquete tipo taza de cafe para obtener solicitudes extra:",
+        "support_pack_1": "☕ Una taza · +50",
+        "support_pack_2": "☕☕ Dos tazas · +150",
+        "support_pack_3": "☕☕☕ Tres tazas · +300",
+        "support_custom_button": "💰 Monto propio",
+        "support_custom": "💡 El flujo de monto propio sera el siguiente paso. Por ahora usa los paquetes de taza de cafe.",
+        "support_bonus_activated": "✅ Bono activado: +{bonus} solicitudes hasta {bonus_until}.",
+        "support_payment_pending": "⏳ La simulacion de pago fue enviada para aprobacion del admin. Recibiras una notificacion despues de la revision.",
+        "support_request_rejected": "❌ La solicitud de apoyo no fue aprobada. Intentalo mas tarde.",
+        "precost_prompt": "⚠️ Este archivo puede consumir alrededor de {cost} solicitudes por tamano/tipo. Continuar?",
+        "precost_continue_button": "✅ Continuar",
+        "precost_cancel_button": "✖️ Cancelar",
+        "precost_cancelled": "Cancelado. El procesamiento del archivo no se inicio.",
     },
     "de": {
         "welcome": "👋 Willkommen beim Yonchee Text2Speech-Bot!",
@@ -281,6 +352,19 @@ MESSAGES = {
         "bot_short_description": "Foto/PDF → Sprachnachricht. Automatische Spracherkennung. Für Menschen mit Sehbehinderung.",
         "feedback_prompt": "📝 Schreib dein Feedback in die nächste Nachricht — ich leite es weiter. (Oder nutze /feedback dein Text.)",
         "feedback_thanks": "🙏 Danke für dein Feedback!",
+        "support_menu": "💙 Yonchee unterstuetzen\n\nWaehle ein Kaffeetassen-Paket fuer Bonus-Anfragen:",
+        "support_pack_1": "☕ Eine Tasse · +50",
+        "support_pack_2": "☕☕ Zwei Tassen · +150",
+        "support_pack_3": "☕☕☕ Drei Tassen · +300",
+        "support_custom_button": "💰 Eigener Betrag",
+        "support_custom": "💡 Der Flow fuer eigenen Betrag kommt als naechster Schritt. Nutze vorerst die Kaffeetassen-Pakete.",
+        "support_bonus_activated": "✅ Bonus aktiviert: +{bonus} Anfragen bis {bonus_until}.",
+        "support_payment_pending": "⏳ Die Zahlungssimulation wartet auf Admin-Freigabe. Nach der Pruefung bekommst du eine Benachrichtigung.",
+        "support_request_rejected": "❌ Die Support-Anfrage wurde nicht freigegeben. Bitte spaeter erneut versuchen.",
+        "precost_prompt": "⚠️ Diese Datei kann wegen Groesse/Typ etwa {cost} Anfragen verbrauchen. Fortfahren?",
+        "precost_continue_button": "✅ Fortfahren",
+        "precost_cancel_button": "✖️ Abbrechen",
+        "precost_cancelled": "Abgebrochen. Die Dateiverarbeitung wurde nicht gestartet.",
     },
     "fr": {
         "welcome": "👋 Bienvenue sur le bot Yonchee Text2Speech !",
@@ -319,6 +403,19 @@ MESSAGES = {
         "bot_short_description": "Photo/PDF → message vocal. Détection automatique de la langue. Aide les personnes malvoyantes.",
         "feedback_prompt": "📝 Écris ton retour dans le prochain message — je le transmettrai. (Tu peux aussi utiliser /feedback ton texte.)",
         "feedback_thanks": "🙏 Merci pour ton retour !",
+        "support_menu": "💙 Soutenir Yonchee\n\nChoisis un pack tasse de cafe pour obtenir des requetes bonus :",
+        "support_pack_1": "☕ Une tasse · +50",
+        "support_pack_2": "☕☕ Deux tasses · +150",
+        "support_pack_3": "☕☕☕ Trois tasses · +300",
+        "support_custom_button": "💰 Montant perso",
+        "support_custom": "💡 Le flux montant perso arrive ensuite. Pour l'instant, utilise les packs tasse de cafe.",
+        "support_bonus_activated": "✅ Bonus active : +{bonus} requetes jusqu'au {bonus_until}.",
+        "support_payment_pending": "⏳ La simulation de paiement attend la validation admin. Tu recevras une notification apres verification.",
+        "support_request_rejected": "❌ La demande de soutien n'a pas ete approuvee. Reessaie plus tard.",
+        "precost_prompt": "⚠️ Ce fichier peut consommer environ {cost} requetes selon sa taille/type. Continuer ?",
+        "precost_continue_button": "✅ Continuer",
+        "precost_cancel_button": "✖️ Annuler",
+        "precost_cancelled": "Annule. Le traitement du fichier n'a pas demarre.",
     },
     "pl": {
         "welcome": "👋 Witaj w bocie Yonchee Text2Speech!",
@@ -357,6 +454,19 @@ MESSAGES = {
         "bot_short_description": "Zdjęcie/PDF → wiadomość głosowa. Automatyczne wykrywanie języka. Pomaga osobom słabowidzącym.",
         "feedback_prompt": "📝 Napisz swoją opinię w następnej wiadomości — przekażę ją. (Możesz też użyć /feedback twój tekst.)",
         "feedback_thanks": "🙏 Dziękujemy za opinię!",
+        "support_menu": "💙 Wesprzyj Yonchee\n\nWybierz pakiet kawa, aby otrzymac bonusowe zapytania:",
+        "support_pack_1": "☕ Jedna kawa · +50",
+        "support_pack_2": "☕☕ Dwie kawy · +150",
+        "support_pack_3": "☕☕☕ Trzy kawy · +300",
+        "support_custom_button": "💰 Wlasna kwota",
+        "support_custom": "💡 Scenariusz wlasnej kwoty bedzie nastepnym krokiem. Na razie uzyj pakietow kawa.",
+        "support_bonus_activated": "✅ Bonus aktywowany: +{bonus} zapytan do {bonus_until}.",
+        "support_payment_pending": "⏳ Symulacja platnosci czeka na akceptacje admina. Po weryfikacji dostaniesz powiadomienie.",
+        "support_request_rejected": "❌ Prosba o wsparcie nie zostala zatwierdzona. Sprobuj pozniej.",
+        "precost_prompt": "⚠️ Ten plik moze zuzyc okolo {cost} zapytan przez rozmiar/typ. Kontynuowac?",
+        "precost_continue_button": "✅ Kontynuuj",
+        "precost_cancel_button": "✖️ Anuluj",
+        "precost_cancelled": "Anulowano. Przetwarzanie pliku nie zostalo uruchomione.",
     },
     "pt": {
         "welcome": "👋 Bem-vindo ao bot Yonchee Text2Speech!",
@@ -395,6 +505,19 @@ MESSAGES = {
         "bot_short_description": "Foto/PDF → mensagem de voz. Detecção automática de idioma. Ajuda pessoas com baixa visão.",
         "feedback_prompt": "📝 Escreva seu comentário na próxima mensagem — vou repassá-lo. (Você também pode usar /feedback seu texto.)",
         "feedback_thanks": "🙏 Obrigado pelo seu comentário!",
+        "support_menu": "💙 Apoiar Yonchee\n\nEscolha um pacote tipo xicara de cafe para receber pedidos bonus:",
+        "support_pack_1": "☕ Uma xicara · +50",
+        "support_pack_2": "☕☕ Duas xicaras · +150",
+        "support_pack_3": "☕☕☕ Tres xicaras · +300",
+        "support_custom_button": "💰 Valor proprio",
+        "support_custom": "💡 O fluxo de valor proprio sera o proximo passo. Por enquanto use os pacotes de xicara de cafe.",
+        "support_bonus_activated": "✅ Bonus ativado: +{bonus} pedidos ate {bonus_until}.",
+        "support_payment_pending": "⏳ A simulacao de pagamento foi enviada para aprovacao do admin. Voce sera avisado apos a revisao.",
+        "support_request_rejected": "❌ O pedido de apoio nao foi aprovado. Tente novamente mais tarde.",
+        "precost_prompt": "⚠️ Este arquivo pode consumir cerca de {cost} pedidos por tamanho/tipo. Continuar?",
+        "precost_continue_button": "✅ Continuar",
+        "precost_cancel_button": "✖️ Cancelar",
+        "precost_cancelled": "Cancelado. O processamento do arquivo nao foi iniciado.",
     },
 }
 DEFAULT_UI_LANG = "en"
@@ -415,6 +538,13 @@ def t(update: Update, key: str, **kwargs) -> str:
     msg = MESSAGES.get(lang, MESSAGES[DEFAULT_UI_LANG]).get(key) or MESSAGES[DEFAULT_UI_LANG][key]
     return msg.format(**kwargs) if kwargs else msg
 
+
+def t_lang(lang: str, key: str, **kwargs) -> str:
+    """Resolve a localized string by language code directly."""
+    code = (lang or "")[:2].lower()
+    msg = MESSAGES.get(code, MESSAGES[DEFAULT_UI_LANG]).get(key) or MESSAGES[DEFAULT_UI_LANG][key]
+    return msg.format(**kwargs) if kwargs else msg
+
 DOCUMENT_INTELLIGENCE_ENDPOINT = os.environ["AZURE_FORM_RECOGNIZER_ENDPOINT"]
 DOCUMENT_INTELLIGENCE_KEY = os.environ["AZURE_FORM_RECOGNIZER_KEY"]
 SPEECH_API_KEY = os.environ["AZURE_SPEECH_API_KEY"]
@@ -426,6 +556,7 @@ BOT_ENV = os.environ.get("BOT_ENV", "local")
 AZURE_STORAGE_CONNECTION_STRING = os.environ.get("AZURE_STORAGE_CONNECTION_STRING", "")
 ADMIN_USER_IDS = {x.strip() for x in os.environ.get("ADMIN_USER_IDS", "").split(",") if x.strip()}
 OCR_FALLBACK = os.environ.get("OCR_FALLBACK", "tesseract").strip().lower()  # tesseract | llm
+SUPPORT_PAYMENT_MODE = os.environ.get("SUPPORT_PAYMENT_MODE", "admin_stub").strip().lower()  # instant | admin_stub
 
 
 def _is_admin(update) -> bool:
@@ -435,7 +566,8 @@ def _is_admin(update) -> bool:
 
 def log_usage(user_id: int, status: str, reason: str = None, language: str = None,
               ocr_pages: int = None, tts_chars: int = None, file_type: str = None,
-              file_size_kb: int = None, duration_ms: int = None) -> None:
+              file_size_kb: int = None, duration_ms: int = None,
+              cost_credits: int = None) -> None:
     """Emit a structured usage record to App Insights (lands in the traces table).
 
     Every record carries `status` (success|failure); failures also carry `reason`.
@@ -455,6 +587,7 @@ def log_usage(user_id: int, status: str, reason: str = None, language: str = Non
         "file_type": file_type,
         "file_size_kb": file_size_kb,
         "duration_ms": duration_ms,
+        "cost_credits": cost_credits,
     }
     dims.update({k: v for k, v in optional.items() if v is not None})
     logger.info("UsageMetrics", extra={"custom_dimensions": dims})
@@ -469,6 +602,18 @@ def log_feedback(user_id: int, ui_lang: str, text: str) -> None:
         "language": ui_lang or "",
         "feedback": (text or "")[:1000],
     }})
+
+
+def log_growth_event(user_id: int, event_type: str, source: str = None) -> None:
+    """Emit growth/attribution events (e.g. /start deep-link source)."""
+    dims = {
+        "bot_env": BOT_ENV,
+        "event_type": event_type,
+        "user_id": user_id,
+    }
+    if source:
+        dims["source"] = source[:100]
+    logger.info("GrowthMetrics", extra={"custom_dimensions": dims})
 
 
 def classify_file_type(mime_type: str) -> str:
@@ -494,6 +639,7 @@ USER_TABLE_NAME = "users"
 FEEDBACK_TABLE_NAME = "feedback"
 STORE_PARTITION = BOT_ENV or "user"  # isolate dev/prod data within one shared table
 MAX_RECENT_LANGS = 3
+FREE_DAILY_LIMIT = max(1, int(os.environ.get("FREE_DAILY_LIMIT", "5")))
 # How long a pending /feedback prompt stays "armed" (survives scale-to-zero / replica
 # switch via storage). Beyond this, a stray text message won't be captured as feedback.
 FEEDBACK_WAIT_WINDOW_SEC = 3600
@@ -506,6 +652,13 @@ class _MemoryStore:
 
     def get_user(self, user_id):
         return dict(self._d.get(user_id, {}))
+
+    def set_quota_state(self, user_id, quota_day, daily_used, bonus_credits, bonus_until):
+        u = self._d.setdefault(user_id, {})
+        u["quota_day"] = quota_day or ""
+        u["daily_used"] = str(max(0, int(daily_used or 0)))
+        u["bonus_credits"] = str(max(0, int(bonus_credits or 0)))
+        u["bonus_until"] = bonus_until or ""
 
     def set_default_lang(self, user_id, locale2):
         u = self._d.setdefault(user_id, {})
@@ -550,7 +703,11 @@ class _TableStore:
         try:
             e = self._client.get_entity(STORE_PARTITION, str(user_id))
             return {"default_lang": e.get("default_lang") or "", "recent": e.get("recent") or "",
-                    "awaiting_fb": e.get("awaiting_fb") or 0}
+                    "awaiting_fb": e.get("awaiting_fb") or 0,
+                    "quota_day": e.get("quota_day") or "",
+                    "daily_used": e.get("daily_used") or "0",
+                    "bonus_credits": e.get("bonus_credits") or "0",
+                    "bonus_until": e.get("bonus_until") or ""}
         except ResourceNotFoundError:
             return {}
         except Exception as ex:
@@ -573,6 +730,15 @@ class _TableStore:
         recent = [x for x in u.get("recent", "").split(",") if x]
         recent = [locale2] + [x for x in recent if x != locale2]
         self._upsert(user_id, recent=",".join(recent[:MAX_RECENT_LANGS]))
+
+    def set_quota_state(self, user_id, quota_day, daily_used, bonus_credits, bonus_until):
+        self._upsert(
+            user_id,
+            quota_day=quota_day or "",
+            daily_used=str(max(0, int(daily_used or 0))),
+            bonus_credits=str(max(0, int(bonus_credits or 0))),
+            bonus_until=bonus_until or "",
+        )
 
     def set_awaiting_feedback(self, user_id, on):
         # Persisted so a /feedback prompt survives scale-to-zero and replica switches.
@@ -691,6 +857,14 @@ OCR_LOCALE_HINT_LANGS = {"en", "uk", "ru", "es", "de", "fr", "pl", "pt", "it", "
 # the dominant language covers at least this fraction of the text; else we ask.
 AUTO_DETECT_MIN_CONFIDENCE = 0.6
 AUTO_DETECT_MIN_COVERAGE = 0.6
+PRECOST_CONFIRM_MIN_COST = max(2, int(os.environ.get("PRECOST_CONFIRM_MIN_COST", "2")))
+
+# Dev support packages (mock accrual now; real billing via Telegram Stars next).
+SUPPORT_PACKS = {
+    "coffee1": {"bonus": 50, "days": 30},
+    "coffee2": {"bonus": 150, "days": 30},
+    "coffee3": {"bonus": 300, "days": 30},
+}
 
 
 def detect_dominant_language(result):
@@ -881,6 +1055,144 @@ def remove_temp_file(path):
                 except Exception as cleanup_exc2:
                     logger.warning(f"[Retry] Failed to remove temp file {path}: {cleanup_exc2}")
 
+
+def _utc_today() -> str:
+    return time.strftime("%Y-%m-%d", time.gmtime())
+
+
+def _add_days(iso_day: str, days: int) -> str:
+    base = datetime.strptime(iso_day, "%Y-%m-%d").date()
+    return (base + timedelta(days=max(0, int(days)))).isoformat()
+
+
+def _to_int(value, default=0):
+    try:
+        return int(str(value))
+    except (TypeError, ValueError):
+        return default
+
+
+def _load_quota(user_id: int):
+    """Load and normalize user's quota state, auto-resetting day/expired bonus."""
+    raw = user_store.get_user(user_id) or {}
+    today = _utc_today()
+    quota_day = (raw.get("quota_day") or "").strip()
+    daily_used = max(0, _to_int(raw.get("daily_used"), 0))
+    bonus_credits = max(0, _to_int(raw.get("bonus_credits"), 0))
+    bonus_until = (raw.get("bonus_until") or "").strip()
+
+    changed = False
+    if quota_day != today:
+        quota_day = today
+        daily_used = 0
+        changed = True
+    if bonus_credits > 0 and bonus_until and bonus_until < today:
+        bonus_credits = 0
+        bonus_until = ""
+        changed = True
+
+    if changed:
+        try:
+            user_store.set_quota_state(user_id, quota_day, daily_used, bonus_credits, bonus_until)
+        except Exception as ex:
+            logger.warning(f"set_quota_state failed: {ex!r}")
+
+    free_left = max(0, FREE_DAILY_LIMIT - daily_used)
+    return {
+        "quota_day": quota_day,
+        "daily_used": daily_used,
+        "free_left": free_left,
+        "free_total": FREE_DAILY_LIMIT,
+        "bonus_credits": bonus_credits,
+        "bonus_until": bonus_until,
+    }
+
+
+def _consume_quota(user_id: int, cost: int = 1):
+    """Spend daily free quota first, then bonus credits. Returns (ok, snapshot)."""
+    if cost <= 0:
+        return True, _load_quota(user_id)
+    snap = _load_quota(user_id)
+    free_left = snap["free_left"]
+    bonus = snap["bonus_credits"]
+
+    if free_left + bonus < cost:
+        return False, snap
+
+    if free_left >= cost:
+        snap["daily_used"] += cost
+    else:
+        from_free = free_left
+        snap["daily_used"] += from_free
+        snap["bonus_credits"] = max(0, bonus - (cost - from_free))
+
+    snap["free_left"] = max(0, FREE_DAILY_LIMIT - snap["daily_used"])
+    try:
+        user_store.set_quota_state(
+            user_id,
+            snap["quota_day"],
+            snap["daily_used"],
+            snap["bonus_credits"],
+            snap["bonus_until"],
+        )
+    except Exception as ex:
+        logger.warning(f"set_quota_state failed: {ex!r}")
+    return True, snap
+
+
+def _grant_bonus_credits(user_id: int, bonus: int, days: int):
+    """Add bonus credits and extend bonus validity window."""
+    bonus = max(0, int(bonus or 0))
+    days = max(0, int(days or 0))
+    if bonus <= 0:
+        return _load_quota(user_id)
+
+    snap = _load_quota(user_id)
+    today = _utc_today()
+    cur_until = (snap.get("bonus_until") or "").strip()
+    if cur_until and cur_until >= today:
+        start = cur_until
+    else:
+        start = today
+    new_until = _add_days(start, days) if days > 0 else (cur_until or "")
+    new_bonus = snap.get("bonus_credits", 0) + bonus
+
+    try:
+        user_store.set_quota_state(
+            user_id,
+            snap["quota_day"],
+            snap["daily_used"],
+            new_bonus,
+            new_until,
+        )
+    except Exception as ex:
+        logger.warning(f"set_quota_state failed: {ex!r}")
+    return _load_quota(user_id)
+
+
+def _estimate_request_cost(file_type: str, file_size_kb: Optional[int]) -> int:
+    """Rough pre-cost estimate used for upfront confirmation on heavy files."""
+    size = int(file_size_kb or 0)
+    if file_type == "pdf":
+        if size >= 5000:
+            return 3
+        if size >= 1200:
+            return 2
+        return 1
+    if file_type == "image":
+        if size >= 5000:
+            return 2
+    return 1
+
+
+def _build_support_admin_keyboard(user_id: int, pack_key: str, ui_lang: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("✅ Approve", callback_data=f"supadm:approve:{user_id}:{pack_key}:{ui_lang}"),
+            InlineKeyboardButton("✖️ Reject", callback_data=f"supadm:reject:{user_id}:{pack_key}:{ui_lang}"),
+        ]
+    ])
+
 async def _keep_typing(bot, chat_id: int, stop: asyncio.Event) -> None:
     while not stop.is_set():
         try:
@@ -895,13 +1207,53 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     logger.info(f"User {user_id} requested help")
     await update.message.reply_text(t(update, "help"))
 
+
+async def limits_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    snap = _load_quota(update.effective_user.id)
+    await update.message.reply_text(
+        t(
+            update,
+            "limits_status",
+            free_left=snap["free_left"],
+            free_total=snap["free_total"],
+            bonus_left=snap["bonus_credits"],
+            bonus_until=(snap["bonus_until"] or "-"),
+        )
+    )
+
+
+def build_support_keyboard(update: Update) -> InlineKeyboardMarkup:
+    rows = [
+        [InlineKeyboardButton(t(update, "support_pack_1"), callback_data="sup:pack:coffee1")],
+        [InlineKeyboardButton(t(update, "support_pack_2"), callback_data="sup:pack:coffee2")],
+        [InlineKeyboardButton(t(update, "support_pack_3"), callback_data="sup:pack:coffee3")],
+        [InlineKeyboardButton(t(update, "support_custom_button"), callback_data="sup:custom")],
+    ]
+    return InlineKeyboardMarkup(rows)
+
+
+async def support_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    log_growth_event(update.effective_user.id, event_type="support_view")
+    await update.message.reply_text(t(update, "support_menu"), reply_markup=build_support_keyboard(update))
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
     lang_code = update.effective_user.language_code[:2] if update.effective_user.language_code else "Unknown"
-    logger.info(f"UserStartedBot: user_id={user_id}, lang={lang_code}")
+    start_source = (context.args[0].strip() if context.args else "")[:100]
+    logger.info(f"UserStartedBot: user_id={user_id}, lang={lang_code}, source={start_source or '-'}")
+    log_growth_event(user_id, event_type="onboarding_start", source=start_source or None)
     await update.message.reply_text(
-        f"{t(update, 'welcome')}\n{t(update, 'help')}\n\n{t(update, 'lang_hint')}"
+        f"{t(update, 'welcome')}\n\n{t(update, 'mission_intro')}\n\n{t(update, 'lang_hint')}",
+        reply_markup=build_onboarding_keyboard(update),
     )
+
+
+def build_onboarding_keyboard(update: Update) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(t(update, "onboarding_start_button"), callback_data="onb:start")],
+        [InlineKeyboardButton(t(update, "onboarding_listen_button"), callback_data="onb:listen")],
+        [InlineKeyboardButton(t(update, "onboarding_support_button"), callback_data="onb:support")],
+    ])
 
 def build_language_keyboard(update: Update, detected_locale, recent=None) -> InlineKeyboardMarkup:
     """Inline keyboard: detected language pinned first (if recognized), then the
@@ -986,58 +1338,44 @@ def extract_text(file_path: str, file_type: str, pinned_lang: str = None) -> Ocr
     return OcrResult(normalized_text, ocr_pages, locale2, conf, coverage, script_lang, False)
 
 
-async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Entry point: download → OCR (with language detection) → auto-synthesize if
-    the language is confidently detected, otherwise show the language picker."""
+async def _process_file_payload(
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+        file_id: str,
+        file_type: str,
+        file_size_kb: Optional[int],
+        cost_credits: int,
+) -> None:
+    """Download → OCR/detect → synthesize flow for an accepted file payload."""
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
-    logger.info(f"User {user_id} sent a file or photo")
-    file = update.message.document or update.message.photo[-1]
-    mime_type = getattr(file, "mime_type", None)
-    file_size = getattr(file, "file_size", None)
-    file_type = classify_file_type(mime_type if mime_type else "image/jpeg")
-    file_size_kb = round(file_size / 1024) if file_size else None
-    logger.info(
-        f"File attributes for user {user_id}: "
-        f"type={type(file)}, "
-        f"file_name={getattr(file,'file_name',None)}, "
-        f"mime_type={mime_type}, "
-        f"file_size={file_size}"
-    )
-    if not is_supported_file(file):
-        await update.message.reply_text(t(update, "unsupported_file"))
-        log_usage(user_id, status="failure", reason="unsupported_file",
-                  file_type=file_type, file_size_kb=file_size_kb)
-        return
-
-    status_message = await update.message.reply_text(t(update, "analyzing"))
+    status_message = await context.bot.send_message(chat_id, t(update, "analyzing"))
     stop_typing = asyncio.Event()
     typing_task = asyncio.create_task(_keep_typing(context.bot, chat_id, stop_typing))
     file_path = None
     t0 = time.monotonic()
     try:
-        tg_file = await file.get_file()
+        tg_file = await context.bot.get_file(file_id)
         file_path = tempfile.mktemp()
         await tg_file.download_to_drive(file_path)
 
         prefs = user_store.get_user(user_id)
         default_lang = (prefs.get("default_lang") or "").strip()
 
-        # Fallback OCR for languages Azure can't extract (e.g. Georgian), reached
-        # by pinning that language via /language. Engine chosen by OCR_FALLBACK.
         if default_lang in FALLBACK_LANGS:
             ocr = await asyncio.to_thread(extract_text, file_path, file_type, default_lang)
             normalized_text = ocr.text
             ocr_ms = round((time.monotonic() - t0) * 1000)
             if not normalized_text.strip():
                 await status_message.edit_text(t(update, "no_text"))
-                await update.message.reply_text(t(update, "help"))
+                await context.bot.send_message(chat_id, t(update, "help"))
                 log_usage(user_id, status="failure", reason="no_text_fallback",
-                          file_type=file_type, file_size_kb=file_size_kb, duration_ms=ocr_ms)
+                          file_type=file_type, file_size_kb=file_size_kb, duration_ms=ocr_ms,
+                          cost_credits=cost_credits)
                 return
             context.user_data["ocr_job"] = {
                 "text": normalized_text, "ocr_pages": ocr.ocr_pages, "ocr_ms": ocr_ms,
-                "file_type": file_type, "file_size_kb": file_size_kb,
+                "file_type": file_type, "file_size_kb": file_size_kb, "cost_credits": cost_credits,
             }
             info = VOICE_MAP[default_lang]
             await status_message.edit_text(
@@ -1047,8 +1385,6 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             await synthesize_and_send(update, context, default_lang, status_message=None)
             return
 
-        # If the user pinned a hint-eligible language, pass it so Azure Read gets a
-        # locale hint; otherwise (auto-detect) extract without one.
         hint_lang = default_lang if default_lang in OCR_LOCALE_HINT_LANGS else None
         ocr = extract_text(file_path, file_type, pinned_lang=hint_lang)
         normalized_text = ocr.text
@@ -1058,20 +1394,20 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         if not normalized_text.strip():
             logger.info(f"User {user_id} uploaded a file with no detectable text")
             await status_message.edit_text(t(update, "no_text"))
-            await update.message.reply_text(t(update, "help"))
+            await context.bot.send_message(chat_id, t(update, "help"))
             log_usage(user_id, status="failure", reason="no_text", ocr_pages=ocr_pages,
-                      file_type=file_type, file_size_kb=file_size_kb, duration_ms=ocr_ms)
+                      file_type=file_type, file_size_kb=file_size_kb, duration_ms=ocr_ms,
+                      cost_credits=cost_credits)
             return
 
         locale2, conf, coverage = ocr.locale2, ocr.confidence, ocr.coverage
         logger.info(f"User {user_id}: script={ocr.script_lang} lang={locale2} conf={conf:.2f} coverage={coverage:.2f}")
         context.user_data["ocr_job"] = {
             "text": normalized_text, "ocr_pages": ocr_pages, "ocr_ms": ocr_ms,
-            "file_type": file_type, "file_size_kb": file_size_kb,
+            "file_type": file_type, "file_size_kb": file_size_kb, "cost_credits": cost_credits,
         }
 
         if default_lang in VOICE_MAP:
-            # User pinned a language via /language — skip detection and the menu.
             info = VOICE_MAP[default_lang]
             await status_message.edit_text(
                 t(update, "using_default").format(lang=f'{info["flag"]} {info["name"]}')
@@ -1098,11 +1434,12 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         try:
             await status_message.edit_text(t(update, "generic_error"))
         except Exception:
-            await update.message.reply_text(t(update, "generic_error"))
-        await update.message.reply_text(t(update, "help"))
+            await context.bot.send_message(chat_id, t(update, "generic_error"))
+        await context.bot.send_message(chat_id, t(update, "help"))
         log_usage(user_id, status="failure", reason="ocr_exception",
                   file_type=file_type, file_size_kb=file_size_kb,
-                  duration_ms=round((time.monotonic() - t0) * 1000))
+                  duration_ms=round((time.monotonic() - t0) * 1000),
+                  cost_credits=cost_credits)
     finally:
         stop_typing.set()
         typing_task.cancel()
@@ -1111,6 +1448,118 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         except asyncio.CancelledError:
             pass
         remove_temp_file(file_path)
+
+
+async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Entry point for document/photo uploads with pre-cost guard for heavy files."""
+    user_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+    logger.info(f"User {user_id} sent a file or photo")
+    file = update.message.document or update.message.photo[-1]
+    mime_type = getattr(file, "mime_type", None)
+    file_size = getattr(file, "file_size", None)
+    file_type = classify_file_type(mime_type if mime_type else "image/jpeg")
+    file_size_kb = round(file_size / 1024) if file_size else None
+    file_id = getattr(file, "file_id", "")
+    logger.info(
+        f"File attributes for user {user_id}: "
+        f"type={type(file)}, "
+        f"file_name={getattr(file,'file_name',None)}, "
+        f"mime_type={mime_type}, "
+        f"file_size={file_size}"
+    )
+    if not is_supported_file(file):
+        await update.message.reply_text(t(update, "unsupported_file"))
+        log_usage(user_id, status="failure", reason="unsupported_file",
+                  file_type=file_type, file_size_kb=file_size_kb)
+        return
+
+    cost = _estimate_request_cost(file_type, file_size_kb)
+    if cost >= PRECOST_CONFIRM_MIN_COST:
+        context.user_data["pending_precost"] = {
+            "file_id": file_id,
+            "file_type": file_type,
+            "file_size_kb": file_size_kb,
+            "cost": cost,
+        }
+        log_growth_event(user_id, event_type="precost_prompt_shown", source=str(cost))
+        await update.message.reply_text(
+            t(update, "precost_prompt").format(cost=cost),
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton(t(update, "precost_continue_button"), callback_data="pre:ok"),
+                InlineKeyboardButton(t(update, "precost_cancel_button"), callback_data="pre:cancel"),
+            ]])
+        )
+        return
+
+    ok, snap = _consume_quota(user_id, cost=cost)
+    if not ok:
+        await update.message.reply_text(t(update, "limit_reached"))
+        await update.message.reply_text(
+            t(
+                update,
+                "limits_status",
+                free_left=snap["free_left"],
+                free_total=snap["free_total"],
+                bonus_left=snap["bonus_credits"],
+                bonus_until=(snap["bonus_until"] or "-"),
+            )
+        )
+        log_usage(user_id, status="failure", reason="quota_exceeded",
+                  file_type=file_type, file_size_kb=file_size_kb, cost_credits=cost)
+        return
+
+    await _process_file_payload(update, context, file_id=file_id, file_type=file_type,
+                                file_size_kb=file_size_kb, cost_credits=cost)
+
+
+async def on_precost_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+    action = (query.data or "").split(":", 1)[-1]
+    pending = context.user_data.get("pending_precost")
+    if not pending:
+        await context.bot.send_message(update.effective_chat.id, t(update, "help"))
+        return
+
+    user_id = update.effective_user.id
+    if action != "ok":
+        log_growth_event(user_id, event_type="precost_cancel")
+        context.user_data.pop("pending_precost", None)
+        await context.bot.send_message(update.effective_chat.id, t(update, "precost_cancelled"))
+        return
+
+    cost = int(pending.get("cost") or 1)
+    ok, snap = _consume_quota(user_id, cost=cost)
+    if not ok:
+        context.user_data.pop("pending_precost", None)
+        await context.bot.send_message(update.effective_chat.id, t(update, "limit_reached"))
+        await context.bot.send_message(
+            update.effective_chat.id,
+            t(
+                update,
+                "limits_status",
+                free_left=snap["free_left"],
+                free_total=snap["free_total"],
+                bonus_left=snap["bonus_credits"],
+                bonus_until=(snap["bonus_until"] or "-"),
+            )
+        )
+        log_usage(user_id, status="failure", reason="quota_exceeded",
+                  file_type=pending.get("file_type"), file_size_kb=pending.get("file_size_kb"),
+                  cost_credits=cost)
+        return
+
+    log_growth_event(user_id, event_type="precost_confirm", source=str(cost))
+    context.user_data.pop("pending_precost", None)
+    await _process_file_payload(
+        update,
+        context,
+        file_id=pending.get("file_id") or "",
+        file_type=pending.get("file_type") or "other",
+        file_size_kb=pending.get("file_size_kb"),
+        cost_credits=cost,
+    )
 
 def prepare_tts_text(text: str, locale2: str) -> str:
     """Light, language-specific text cleanup before synthesis.
@@ -1191,6 +1640,7 @@ async def synthesize_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE
     ocr_ms = job.get("ocr_ms", 0)
     file_type = job.get("file_type")
     file_size_kb = job.get("file_size_kb")
+    cost_credits = job.get("cost_credits")
 
     audio_path = None
     ogg_path = None
@@ -1227,7 +1677,7 @@ async def synthesize_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE
             await context.bot.send_message(chat_id, t(update, "help"))
             log_usage(user_id, status="failure", reason="synthesis_error", language=info["name"],
                       ocr_pages=ocr_pages, file_type=file_type, file_size_kb=file_size_kb,
-                      duration_ms=elapsed_ms())
+                      duration_ms=elapsed_ms(), cost_credits=cost_credits)
             return
 
         ogg_path = f"{tempfile.mktemp()}.ogg"
@@ -1240,7 +1690,7 @@ async def synthesize_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE
         logger.info(f"User {user_id} processed a file in language {locale2}")
         log_usage(user_id, status="success", language=info["name"], ocr_pages=ocr_pages,
                   tts_chars=len(normalized_text), file_type=file_type, file_size_kb=file_size_kb,
-                  duration_ms=elapsed_ms())
+                  duration_ms=elapsed_ms(), cost_credits=cost_credits)
 
     except Exception as e:
         logger.error(f"Exception for user {user_id}: {e!r}")
@@ -1249,7 +1699,7 @@ async def synthesize_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE
         await context.bot.send_message(chat_id, t(update, "help"))
         log_usage(user_id, status="failure", reason="exception", language=info["name"],
                   ocr_pages=ocr_pages, file_type=file_type, file_size_kb=file_size_kb,
-                  duration_ms=elapsed_ms())
+                  duration_ms=elapsed_ms(), cost_credits=cost_credits)
     finally:
         stop_typing.set()
         typing_task.cancel()
@@ -1326,6 +1776,155 @@ async def on_setlang_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         await query.edit_message_text(
             t(update, "default_set").format(lang=f'{info["flag"]} {info["name"]}')
         )
+
+
+async def on_onboarding_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+    action = (query.data or "").split(":", 1)[-1]
+
+    if action == "start":
+        await context.bot.send_message(update.effective_chat.id, t(update, "onboarding_started"))
+        await context.bot.send_message(update.effective_chat.id, t(update, "help"))
+        return
+
+    if action == "support":
+        log_growth_event(update.effective_user.id, event_type="support_view", source="onboarding")
+        await context.bot.send_message(
+            update.effective_chat.id,
+            t(update, "support_menu"),
+            reply_markup=build_support_keyboard(update),
+        )
+        return
+
+    if action == "listen":
+        locale2 = resolve_ui_lang(update)
+        if locale2 not in VOICE_MAP:
+            locale2 = "en"
+        audio_path = f"{tempfile.mktemp()}.mp3"
+        ogg_path = f"{tempfile.mktemp()}.ogg"
+        try:
+            await asyncio.to_thread(synthesize_to_file, t(update, "mission_short_audio"), locale2, audio_path)
+            await asyncio.to_thread(convert_mp3_to_ogg, audio_path, ogg_path)
+            with open(ogg_path, "rb") as voice_file:
+                await context.bot.send_voice(chat_id=update.effective_chat.id, voice=voice_file)
+        except Exception as ex:
+            logger.warning(f"mission audio failed: {ex!r}")
+            await context.bot.send_message(update.effective_chat.id, t(update, "mission_audio_error"))
+        finally:
+            remove_temp_file(audio_path)
+            remove_temp_file(ogg_path)
+
+
+async def on_support_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+    data = query.data or ""
+    parts = data.split(":")
+    if len(parts) < 2 or parts[0] != "sup":
+        return
+
+    user_id = update.effective_user.id
+    if parts[1] == "custom":
+        log_growth_event(user_id, event_type="support_custom_click")
+        await context.bot.send_message(update.effective_chat.id, t(update, "support_custom"))
+        return
+
+    if len(parts) == 3 and parts[1] == "pack":
+        pack_key = parts[2]
+        pack = SUPPORT_PACKS.get(pack_key)
+        if not pack:
+            return
+        ui_lang = resolve_ui_lang(update)
+        log_growth_event(user_id, event_type="support_pack_click", source=pack_key)
+        if SUPPORT_PAYMENT_MODE == "admin_stub":
+            log_growth_event(user_id, event_type="support_request_created", source=pack_key)
+            await context.bot.send_message(update.effective_chat.id, t(update, "support_payment_pending"))
+            admin_text = (
+                f"Support approval requested\n"
+                f"User: {user_id}\n"
+                f"Pack: {pack_key}\n"
+                f"Bonus: +{pack['bonus']} / {pack['days']} days"
+            )
+            for aid in ADMIN_USER_IDS:
+                try:
+                    await context.bot.send_message(
+                        chat_id=int(aid),
+                        text=admin_text,
+                        reply_markup=_build_support_admin_keyboard(user_id, pack_key, ui_lang),
+                    )
+                except Exception as ex:
+                    logger.warning(f"support admin notify failed ({aid}): {ex!r}")
+            return
+
+        snap = _grant_bonus_credits(user_id, bonus=pack["bonus"], days=pack["days"])
+        log_growth_event(user_id, event_type="support_bonus_granted", source=pack_key)
+        await context.bot.send_message(
+            update.effective_chat.id,
+            t(update, "support_bonus_activated").format(
+                bonus=pack["bonus"],
+                bonus_until=(snap["bonus_until"] or "-"),
+            ),
+        )
+        await context.bot.send_message(
+            update.effective_chat.id,
+            t(
+                update,
+                "limits_status",
+                free_left=snap["free_left"],
+                free_total=snap["free_total"],
+                bonus_left=snap["bonus_credits"],
+                bonus_until=(snap["bonus_until"] or "-"),
+            ),
+        )
+
+
+async def on_support_admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+    if not _is_admin(update):
+        await context.bot.send_message(update.effective_chat.id, t(update, "help"))
+        return
+    parts = (query.data or "").split(":")
+    if len(parts) != 5 or parts[0] != "supadm":
+        return
+    action, user_id_str, pack_key, ui_lang = parts[1], parts[2], parts[3], parts[4]
+    pack = SUPPORT_PACKS.get(pack_key)
+    if not pack:
+        return
+    try:
+        target_user_id = int(user_id_str)
+    except ValueError:
+        return
+
+    if action == "approve":
+        snap = _grant_bonus_credits(target_user_id, bonus=pack["bonus"], days=pack["days"])
+        log_growth_event(target_user_id, event_type="support_bonus_granted", source=f"admin:{pack_key}")
+        await context.bot.send_message(
+            target_user_id,
+            t_lang(ui_lang, "support_bonus_activated").format(
+                bonus=pack["bonus"],
+                bonus_until=(snap["bonus_until"] or "-"),
+            )
+        )
+        await context.bot.send_message(
+            target_user_id,
+            t_lang(
+                ui_lang,
+                "limits_status",
+                free_left=snap["free_left"],
+                free_total=snap["free_total"],
+                bonus_left=snap["bonus_credits"],
+                bonus_until=(snap["bonus_until"] or "-"),
+            )
+        )
+        await query.edit_message_text(f"Approved: user {target_user_id}, pack {pack_key}.")
+        return
+
+    if action == "reject":
+        log_growth_event(target_user_id, event_type="support_request_rejected", source=f"admin:{pack_key}")
+        await context.bot.send_message(target_user_id, t_lang(ui_lang, "support_request_rejected"))
+        await query.edit_message_text(f"Rejected: user {target_user_id}, pack {pack_key}.")
 
 
 async def feedback_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1472,6 +2071,8 @@ async def _post_init(application) -> None:
     public_cmds = [
         BotCommand("start", "Start / how it works"),
         BotCommand("help", "How to use the bot"),
+        BotCommand("limits", "Show today's free and bonus limits"),
+        BotCommand("support", "Support and get bonus requests"),
         BotCommand("language", "Set audio language (or auto-detect)"),
         BotCommand("feedback", "Send feedback / report an issue"),
     ]
@@ -1507,6 +2108,8 @@ def main() -> None:
     )
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(CommandHandler("limits", limits_command))
+    app.add_handler(CommandHandler("support", support_command))
     app.add_handler(CommandHandler("language", language_command))
     app.add_handler(CommandHandler("feedback", feedback_command))
     app.add_handler(CommandHandler("feedback_recent", feedback_recent_command))
@@ -1514,6 +2117,10 @@ def main() -> None:
     app.add_handler(CommandHandler("feedback_digest", feedback_digest_command))
     app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO, handle_file))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text_message))
+    app.add_handler(CallbackQueryHandler(on_onboarding_callback, pattern=r"^onb:"))
+    app.add_handler(CallbackQueryHandler(on_precost_callback, pattern=r"^pre:"))
+    app.add_handler(CallbackQueryHandler(on_support_callback, pattern=r"^sup:"))
+    app.add_handler(CallbackQueryHandler(on_support_admin_callback, pattern=r"^supadm:"))
     app.add_handler(CallbackQueryHandler(on_setlang_callback, pattern=r"^setlang:"))
     app.add_handler(CallbackQueryHandler(on_language_callback, pattern=r"^lang:"))
 
