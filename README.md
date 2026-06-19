@@ -126,6 +126,17 @@ See [docs/usage-dashboard.md](docs/usage-dashboard.md) for the dashboard and imp
 
 ---
 
+## Related Growth/Monetization Project
+
+This bot repository is operational/technical. Product strategy, monetization, GTM, and marketing materials are maintained in a separate docs-only project:
+
+- `C:\Users\OleksandrBatyn\OneDrive - EPAM\work\yonchee-growth\`
+- Primary handoff/context file: `C:\Users\OleksandrBatyn\OneDrive - EPAM\work\yonchee-growth\HANDOFF.md`
+
+Use that repository for business decisions and launch planning; use this repository for bot implementation and operations.
+
+---
+
 ## Best Practices
 
 - Use secrets for all API keys and tokens.

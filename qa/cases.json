@@ -1,0 +1,169 @@
+{
+  "_comment": "QA corpus manifest. Each case points at a file under qa/corpus/ and declares the expected content language; add an expected_text_file (also under qa/corpus/) to get CER/WER. See qa/README.md.",
+  "cases": [
+    {
+      "id": "eng1",
+      "file": "images/eng1.png",
+      "expected_lang": "en",
+      "pinned_lang": null,
+      "notes": "English text image"
+    },
+    {
+      "id": "guide",
+      "file": "images/guide.jpg",
+      "expected_lang": "en",
+      "expected_text_file": "expected/guide.txt",
+      "pinned_lang": null,
+      "notes": "English screenshot-style text; has ground truth"
+    },
+    {
+      "id": "basic-text-pdf",
+      "file": "images/basic-text.pdf",
+      "expected_lang": "en",
+      "expected_text_file": "expected/basic-text.txt",
+      "pinned_lang": null,
+      "notes": "English PDF (text layer); has ground truth"
+    },
+    {
+      "id": "fr1",
+      "file": "images/fr1.png",
+      "expected_lang": "fr",
+      "pinned_lang": null,
+      "notes": "French text image"
+    },
+    {
+      "id": "rus",
+      "file": "images/rus.png",
+      "expected_lang": "ru",
+      "pinned_lang": null,
+      "notes": "Russian text image"
+    },
+    {
+      "id": "ukr1",
+      "file": "images/ukr1.png",
+      "expected_lang": "uk",
+      "pinned_lang": null,
+      "notes": "Ukrainian text image"
+    },
+    {
+      "id": "ukr2",
+      "file": "images/ukr2.png",
+      "expected_lang": "uk",
+      "pinned_lang": null,
+      "notes": "Ukrainian text image"
+    },
+    {
+      "id": "ch1",
+      "file": "images/ch1.png",
+      "expected_lang": "zh",
+      "pinned_lang": null,
+      "notes": "Chinese (Han script -> resolved by script detection)"
+    },
+    {
+      "id": "kor1",
+      "file": "images/kor1.png",
+      "expected_lang": "ko",
+      "pinned_lang": null,
+      "notes": "Korean (Hangul -> resolved by script detection)"
+    },
+    {
+      "id": "mix1",
+      "file": "images/mix1.png",
+      "expected_lang": "es",
+      "pinned_lang": null,
+      "notes": "Mixed: dominant Spanish with embedded Korean/Hanja characters"
+    },
+    {
+      "id": "mix2",
+      "file": "images/mix2.png",
+      "expected_lang": null,
+      "pinned_lang": null,
+      "notes": "Distorted/noisy Cyrillic; language scoring skipped, observe output only"
+    },
+    {
+      "id": "ka1",
+      "file": "images/ka1.png",
+      "expected_lang": null,
+      "pinned_lang": "ka",
+      "notes": "Georgian: routed to Tesseract fallback (Azure can't extract). Needs tesseract-ocr-kat + poppler installed. Detection N/A on the fallback path; add expected_text for CER."
+    },
+    {
+      "id": "am1",
+      "file": "images/am1.png",
+      "expected_lang": null,
+      "pinned_lang": "hy",
+      "notes": "Armenian: routed to Tesseract fallback. Needs tesseract-ocr-hye installed. Detection N/A on the fallback path; add expected_text for CER."
+    },
+
+    {
+      "id": "photo-ru-01-numbers",
+      "file": "images/photo_2026-06-13_23-21-12.jpg",
+      "expected_lang": "ru",
+      "pinned_lang": null,
+      "notes": "REAL PHOTO: Russian book page, rotated ~90deg, measurements/numbers, patterned background, hand visible. No ground truth (observe + language only)."
+    },
+    {
+      "id": "photo-ru-02-dense",
+      "file": "images/photo_2026-06-13_23-21-26.jpg",
+      "expected_lang": "ru",
+      "pinned_lang": null,
+      "notes": "REAL PHOTO: Russian, dense small two-column text, spiral-bound."
+    },
+    {
+      "id": "photo-ru-03-stamp",
+      "file": "images/photo_2026-06-13_23-21-31.jpg",
+      "expected_lang": "ru",
+      "pinned_lang": null,
+      "notes": "REAL PHOTO: Russian, rotated ~90deg, dense technical text + signature + stamp + small table."
+    },
+    {
+      "id": "photo-ru-04-table",
+      "file": "images/photo_2026-06-13_23-21-36.jpg",
+      "expected_lang": "ru",
+      "pinned_lang": null,
+      "notes": "REAL PHOTO: Russian, rotated ~90deg, full two-column table (design brief)."
+    },
+    {
+      "id": "photo-ru-05-columns",
+      "file": "images/photo_2026-06-13_23-21-41.jpg",
+      "expected_lang": "ru",
+      "pinned_lang": null,
+      "notes": "REAL PHOTO: Russian, rotated ~90deg, dense two-column prose."
+    },
+    {
+      "id": "photo-en-06-book",
+      "file": "images/photo_2026-06-13_23-21-45.jpg",
+      "expected_lang": "en",
+      "pinned_lang": null,
+      "notes": "REAL PHOTO: English book page (The First 90 Days), page curvature, finger, shadow."
+    },
+    {
+      "id": "photo-en-07-table",
+      "file": "images/photo_2026-06-13_23-21-49.jpg",
+      "expected_lang": "en",
+      "pinned_lang": null,
+      "notes": "REAL PHOTO: English book page with a two-column table (Table 7-2)."
+    },
+    {
+      "id": "photo-en-08-prose",
+      "file": "images/photo_2026-06-13_23-21-53.jpg",
+      "expected_lang": "en",
+      "pinned_lang": null,
+      "notes": "REAL PHOTO: English prose (Animal Farm, p.440), slight curvature."
+    },
+    {
+      "id": "photo-en-09-chapter",
+      "file": "images/photo_2026-06-13_23-21-58.jpg",
+      "expected_lang": "en",
+      "pinned_lang": null,
+      "notes": "REAL PHOTO: English prose (Chapter IV, p.394)."
+    },
+    {
+      "id": "photo-en-10-prose",
+      "file": "images/photo_2026-06-13_23-22-04.jpg",
+      "expected_lang": "en",
+      "pinned_lang": null,
+      "notes": "REAL PHOTO: English prose (Animal Farm), finger at bottom edge."
+    }
+  ]
+}

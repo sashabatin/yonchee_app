@@ -6,5 +6,6 @@ python-dotenv==1.0.1
 setuptools<81
 opencensus-ext-azure==1.1.9
 anthropic>=0.39,<1.0
+num2words>=0.5,<1.0  # spell out large numbers for natural TTS (e.g. Ukrainian)
 
 # System requirement: ffmpeg must be installed and available in PATH
