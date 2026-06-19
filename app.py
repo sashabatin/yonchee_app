@@ -101,15 +101,6 @@ MESSAGES = {
             "⏱ If the bot hasn't been used in a while, the first response may take up to 10 seconds to wake up."
         ),
         "unsupported_file": "❌ Unsupported file type or file too large. Please send a PDF, JPEG, PNG, TIFF, BMP, or WebP file (max 17MB).",
-        "ask_language": (
-            "Which language is the text in?\n"
-            "1: Ukrainian 🇺🇦\n"
-            "2: Russian 🇷🇺\n"
-            "3: English 🇬🇧\n"
-            "Please reply with 1, 2, or 3."
-        ),
-        "lang_placeholder": "1: Ukrainian, 2: Russian, 3: English",
-        "invalid_choice": "Invalid choice. Please reply with 1, 2, or 3.",
         "processing": "⏳ Processing your file and generating audio, please wait...",
         "no_text": "No text found in the document.",
         "synthesis_error": "An internal error occurred during speech synthesis. Please try again later.",
@@ -161,15 +152,6 @@ MESSAGES = {
             "⏱ Если ботом давно не пользовались, первый ответ может занять до 10 секунд — нужно «проснуться»."
         ),
         "unsupported_file": "❌ Неподдерживаемый тип файла или слишком большой файл. Пришлите PDF, JPEG, PNG, TIFF, BMP или WebP (до 17 МБ).",
-        "ask_language": (
-            "На каком языке текст?\n"
-            "1: Украинский 🇺🇦\n"
-            "2: Русский 🇷🇺\n"
-            "3: Английский 🇬🇧\n"
-            "Ответьте 1, 2 или 3."
-        ),
-        "lang_placeholder": "1: Украинский, 2: Русский, 3: Английский",
-        "invalid_choice": "Неверный выбор. Ответьте 1, 2 или 3.",
         "processing": "⏳ Обрабатываю файл и генерирую аудио, подождите...",
         "no_text": "В документе не найден текст.",
         "synthesis_error": "Произошла внутренняя ошибка при синтезе речи. Попробуйте позже.",
@@ -221,15 +203,6 @@ MESSAGES = {
             "⏱ Якщо ботом давно не користувалися, перша відповідь може зайняти до 10 секунд — потрібно «прокинутися»."
         ),
         "unsupported_file": "❌ Непідтримуваний тип файлу або завеликий файл. Надішліть PDF, JPEG, PNG, TIFF, BMP або WebP (до 17 МБ).",
-        "ask_language": (
-            "Якою мовою текст?\n"
-            "1: Українська 🇺🇦\n"
-            "2: Російська 🇷🇺\n"
-            "3: Англійська 🇬🇧\n"
-            "Надішліть 1, 2 або 3."
-        ),
-        "lang_placeholder": "1: Українська, 2: Російська, 3: Англійська",
-        "invalid_choice": "Неправильний вибір. Надішліть 1, 2 або 3.",
         "processing": "⏳ Обробляю файл і генерую аудіо, зачекайте...",
         "no_text": "У документі не знайдено тексту.",
         "synthesis_error": "Сталася внутрішня помилка під час синтезу мовлення. Спробуйте пізніше.",
@@ -272,15 +245,6 @@ MESSAGES = {
             "⏱ Si el bot no se ha usado en un tiempo, la primera respuesta puede tardar hasta 10 segundos en activarse."
         ),
         "unsupported_file": "❌ Tipo de archivo no compatible o archivo demasiado grande. Envía un PDF, JPEG, PNG, TIFF, BMP o WebP (máx. 17 MB).",
-        "ask_language": (
-            "¿En qué idioma está el texto?\n"
-            "1: Ucraniano 🇺🇦\n"
-            "2: Ruso 🇷🇺\n"
-            "3: Inglés 🇬🇧\n"
-            "Responde con 1, 2 o 3."
-        ),
-        "lang_placeholder": "1: Ucraniano, 2: Ruso, 3: Inglés",
-        "invalid_choice": "Opción no válida. Responde con 1, 2 o 3.",
         "processing": "⏳ Procesando tu archivo y generando el audio, espera por favor...",
         "no_text": "No se encontró texto en el documento.",
         "synthesis_error": "Ocurrió un error interno durante la síntesis de voz. Inténtalo de nuevo más tarde.",
@@ -323,15 +287,6 @@ MESSAGES = {
             "⏱ Wenn der Bot eine Weile nicht genutzt wurde, kann die erste Antwort bis zu 10 Sekunden dauern (Aufwachen)."
         ),
         "unsupported_file": "❌ Nicht unterstützter Dateityp oder Datei zu groß. Bitte sende eine PDF-, JPEG-, PNG-, TIFF-, BMP- oder WebP-Datei (max. 17 MB).",
-        "ask_language": (
-            "In welcher Sprache ist der Text?\n"
-            "1: Ukrainisch 🇺🇦\n"
-            "2: Russisch 🇷🇺\n"
-            "3: Englisch 🇬🇧\n"
-            "Bitte antworte mit 1, 2 oder 3."
-        ),
-        "lang_placeholder": "1: Ukrainisch, 2: Russisch, 3: Englisch",
-        "invalid_choice": "Ungültige Auswahl. Bitte antworte mit 1, 2 oder 3.",
         "processing": "⏳ Deine Datei wird verarbeitet und das Audio erstellt, bitte warten...",
         "no_text": "Im Dokument wurde kein Text gefunden.",
         "synthesis_error": "Bei der Sprachsynthese ist ein interner Fehler aufgetreten. Bitte versuche es später erneut.",
@@ -374,15 +329,6 @@ MESSAGES = {
             "⏱ Si le bot n'a pas été utilisé depuis un moment, la première réponse peut prendre jusqu'à 10 secondes (réveil)."
         ),
         "unsupported_file": "❌ Type de fichier non pris en charge ou fichier trop volumineux. Envoie un fichier PDF, JPEG, PNG, TIFF, BMP ou WebP (max. 17 Mo).",
-        "ask_language": (
-            "Dans quelle langue est le texte ?\n"
-            "1 : Ukrainien 🇺🇦\n"
-            "2 : Russe 🇷🇺\n"
-            "3 : Anglais 🇬🇧\n"
-            "Réponds par 1, 2 ou 3."
-        ),
-        "lang_placeholder": "1 : Ukrainien, 2 : Russe, 3 : Anglais",
-        "invalid_choice": "Choix invalide. Réponds par 1, 2 ou 3.",
         "processing": "⏳ Traitement de ton fichier et génération de l'audio, patiente...",
         "no_text": "Aucun texte trouvé dans le document.",
         "synthesis_error": "Une erreur interne s'est produite lors de la synthèse vocale. Réessaie plus tard.",
@@ -425,15 +371,6 @@ MESSAGES = {
             "⏱ Jeśli bot nie był używany przez jakiś czas, pierwsza odpowiedź może zająć do 10 sekund (wybudzanie)."
         ),
         "unsupported_file": "❌ Nieobsługiwany typ pliku lub plik zbyt duży. Wyślij plik PDF, JPEG, PNG, TIFF, BMP lub WebP (maks. 17 MB).",
-        "ask_language": (
-            "W jakim języku jest tekst?\n"
-            "1: Ukraiński 🇺🇦\n"
-            "2: Rosyjski 🇷🇺\n"
-            "3: Angielski 🇬🇧\n"
-            "Odpowiedz 1, 2 lub 3."
-        ),
-        "lang_placeholder": "1: Ukraiński, 2: Rosyjski, 3: Angielski",
-        "invalid_choice": "Nieprawidłowy wybór. Odpowiedz 1, 2 lub 3.",
         "processing": "⏳ Przetwarzam plik i generuję audio, poczekaj...",
         "no_text": "Nie znaleziono tekstu w dokumencie.",
         "synthesis_error": "Wystąpił wewnętrzny błąd podczas syntezy mowy. Spróbuj ponownie później.",
@@ -476,15 +413,6 @@ MESSAGES = {
             "⏱ Se o bot não for usado há algum tempo, a primeira resposta pode levar até 10 segundos para acordar."
         ),
         "unsupported_file": "❌ Tipo de arquivo não suportado ou arquivo muito grande. Envie um arquivo PDF, JPEG, PNG, TIFF, BMP ou WebP (máx. 17 MB).",
-        "ask_language": (
-            "Em que idioma está o texto?\n"
-            "1: Ucraniano 🇺🇦\n"
-            "2: Russo 🇷🇺\n"
-            "3: Inglês 🇬🇧\n"
-            "Responda com 1, 2 ou 3."
-        ),
-        "lang_placeholder": "1: Ucraniano, 2: Russo, 3: Inglês",
-        "invalid_choice": "Opção inválida. Responda com 1, 2 ou 3.",
         "processing": "⏳ Processando seu arquivo e gerando o áudio, aguarde...",
         "no_text": "Nenhum texto encontrado no documento.",
         "synthesis_error": "Ocorreu um erro interno durante a síntese de voz. Tente novamente mais tarde.",
