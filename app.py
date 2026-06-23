@@ -498,7 +498,7 @@ OCR_FALLBACK = os.environ.get("OCR_FALLBACK", "llm").strip().lower()  # llm | te
 # (Georgian/Armenian). Falls back to Tesseract when these aren't set.
 AZURE_OPENAI_ENDPOINT = os.environ.get("AZURE_OPENAI_ENDPOINT", "").strip()
 AZURE_OPENAI_API_KEY = os.environ.get("AZURE_OPENAI_API_KEY", "").strip()
-AZURE_OPENAI_DEPLOYMENT = os.environ.get("AZURE_OPENAI_DEPLOYMENT", "gpt-4o-mini").strip()
+AZURE_OPENAI_DEPLOYMENT = os.environ.get("AZURE_OPENAI_DEPLOYMENT", "gpt-4.1-mini").strip()
 AZURE_OPENAI_API_VERSION = os.environ.get("AZURE_OPENAI_API_VERSION", "2024-10-21").strip()
 LLM_OCR_MAX_PDF_PAGES = int(os.environ.get("LLM_OCR_MAX_PDF_PAGES", "10"))
 SUPPORT_PAYMENT_MODE = os.environ.get("SUPPORT_PAYMENT_MODE", "admin_stub").strip().lower()  # instant | admin_stub
@@ -1095,7 +1095,7 @@ def _parse_llm_segments(raw):
 
 
 def run_llm_ocr(file_path, file_type, locale2):
-    """OCR via Azure OpenAI vision (gpt-4o-mini): reads scripts Azure Read can't
+    """OCR via Azure OpenAI vision (gpt-4.1-mini): reads scripts Azure Read can't
     (Georgian, Armenian, ...) and returns language-tagged segments so a mixed page
     is read with the right voice per language. Returns (text, raw_segments), or
     ('', None) when Azure OpenAI isn't configured or the call fails."""
