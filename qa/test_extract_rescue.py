@@ -120,6 +120,27 @@ def run():
 
     check("2-language page is not rescued", result2.locale2 == "ru" and result2.segments is not None)
 
+    # A genuine 3-language Latin/Cyrillic page (kk+ru+en — Yonchee's actual
+    # target market, e.g. a Kazakh document quoting Russian and English) must
+    # NOT be rescued either: none of these have a distinct-script signal to
+    # mismatch, so the suspect-segment check must leave them alone. Rescuing
+    # these anyway would mean paying for an LLM-OCR call on routine traffic.
+    kk, ru3, en3 = "Қ" * 20, "Р" * 20, "E" * 20
+    trilingual_result = _Result(kk + ru3 + en3, [
+        _Lang("kk-KZ", 0.98, [(0, 20)]),
+        _Lang("ru-RU", 0.97, [(20, 20)]),
+        _Lang("en-US", 0.96, [(40, 20)]),
+    ])
+    with patch.object(app.doc_client, "begin_analyze_document",
+                       return_value=_Poller(trilingual_result)), \
+         patch.object(app, "run_llm_ocr", side_effect=AssertionError("should not be called")), \
+         patch.object(app, "OCR_FALLBACK", "llm"), \
+         patch.object(app, "_azure_openai_configured", return_value=True):
+        result3 = app.extract_text(fake_path, "image")
+
+    check("genuine 3-language kk+ru+en page is not rescued",
+          result3.segments is not None and len({loc for loc, _ in result3.segments}) == 3)
+
     os.remove(fake_path)
     print()
     if failures:

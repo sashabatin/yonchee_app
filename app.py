@@ -938,6 +938,21 @@ def detect_script_language(text):
     return None
 
 
+_SCRIPT_RANGE_LANGS = {lang for lang, _ in SCRIPT_RANGES} | {"zh"}
+
+
+def _segment_script_matches(locale2, text):
+    """True unless locale2 is a distinct-alphabet language (Georgian, Thai,
+    Korean, ...) whose own script doesn't actually appear in this segment's
+    text — i.e. Azure's per-line tag is provably wrong for its own claimed
+    alphabet. Shared-script languages (Latin/Cyrillic, no SCRIPT_RANGES entry)
+    always pass: there's no independent script signal to check them against,
+    and that's exactly where real multilingual pages (kk+ru+en, etc.) live."""
+    if locale2 not in _SCRIPT_RANGE_LANGS:
+        return True
+    return detect_script_language(text) == locale2
+
+
 # A secondary language must cover at least this share of the page before we treat
 # it as genuinely multilingual (and read each part with its own voice). Below this,
 # a stray foreign word or a mis-tagged span is folded into the dominant language.
@@ -1547,16 +1562,17 @@ def extract_text(file_path: str, file_type: str, pinned_lang: str = None) -> Ocr
             locale2, conf, coverage = detect_dominant_language(result)
 
     segments = build_language_segments(result, locale2) if locale2 else None
-    distinct_langs = len({loc for loc, _ in segments}) if segments else (1 if locale2 else 0)
+    suspect_segment = segments and any(
+        not _segment_script_matches(loc, text) for loc, text in segments)
 
-    if not normalized_text.strip() or locale2 not in VOICE_MAP or distinct_langs >= 3:
-        # Azure Read found nothing, or what it found isn't one of our supported
-        # languages, or it split the page into 3+ "languages" (real multilingual
-        # pages are pairs — ru+fr, ka+en; 3-way splits are the signature of a
-        # script it can't read at all turning into confidently-wrong garbage,
-        # e.g. a Georgian page coming back as Thai+English+Indonesian). Either
-        # way, give the LLM engine a shot before trusting this result. No-op
-        # cost when LLM isn't configured.
+    if not normalized_text.strip() or locale2 not in VOICE_MAP or suspect_segment:
+        # Azure Read found nothing, what it found isn't one of our supported
+        # languages, or it tagged a span as a distinct-alphabet language whose
+        # own script doesn't match (e.g. a Georgian page coming back tagged
+        # Thai+English+Indonesian — the "th" span isn't actually Thai script).
+        # Real multilingual Latin/Cyrillic pairs (kk+ru+en etc.) have no script
+        # to mismatch and are left alone. Either way, give the LLM engine a
+        # shot before trusting this result. No-op cost when LLM isn't configured.
         if OCR_FALLBACK == "llm" and _azure_openai_configured():
             raw, raw_segments = run_llm_ocr(file_path, file_type, pinned_lang)
             text = normalize_ocr_text(raw or "")
