@@ -495,9 +495,10 @@ AZURE_STORAGE_CONNECTION_STRING = os.environ.get("AZURE_STORAGE_CONNECTION_STRIN
 ADMIN_USER_IDS = {x.strip() for x in os.environ.get("ADMIN_USER_IDS", "").split(",") if x.strip()}
 # User IDs that bypass all daily/bonus limits (e.g. owner, testers). Admins are unlimited too.
 UNLIMITED_USER_IDS = {x.strip() for x in os.environ.get("UNLIMITED_USER_IDS", "").split(",") if x.strip()}
-OCR_FALLBACK = os.environ.get("OCR_FALLBACK", "llm").strip().lower()  # llm | tesseract
+OCR_FALLBACK = os.environ.get("OCR_FALLBACK", "llm").strip().lower()  # llm (default) | off
 # Azure OpenAI (vision) for the LLM OCR fallback — reads scripts Azure Read can't
-# (Georgian/Armenian). Falls back to Tesseract when these aren't set.
+# (Georgian/Armenian). When these aren't set the fallback yields no text (those
+# languages simply can't be read); there is no on-box OCR engine anymore.
 AZURE_OPENAI_ENDPOINT = os.environ.get("AZURE_OPENAI_ENDPOINT", "").strip()
 AZURE_OPENAI_API_KEY = os.environ.get("AZURE_OPENAI_API_KEY", "").strip()
 AZURE_OPENAI_DEPLOYMENT = os.environ.get("AZURE_OPENAI_DEPLOYMENT", "gpt-4.1-mini").strip()
@@ -1036,38 +1037,6 @@ def build_language_segments(result, dominant):
 
 # --- Fallback OCR for languages Azure Read can't extract (e.g. Georgian) ---
 FALLBACK_LANGS = {"ka", "hy"}        # routed to the fallback OCR engine
-TESSERACT_LANG = {"ka": "kat", "hy": "hye"}
-
-
-def run_tesseract_ocr(file_path, file_type, locale2):
-    """OCR via local Tesseract (Georgian/Armenian language data in the image)."""
-    import subprocess
-    import glob
-    lang = TESSERACT_LANG.get(locale2, "eng")
-    images = [file_path]
-    tmp_imgs = []
-    if file_type == "pdf":
-        prefix = tempfile.mktemp()
-        r = subprocess.run(["pdftoppm", "-r", "300", "-png", file_path, prefix],
-                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if r.returncode != 0:
-            logger.error(f"pdftoppm error: {r.stderr.decode(errors='ignore')[:200]}")
-            raise RuntimeError("PDF rasterization failed")
-        tmp_imgs = sorted(glob.glob(prefix + "*.png"))
-        images = tmp_imgs or [file_path]
-    texts = []
-    try:
-        for img in images:
-            r = subprocess.run(["tesseract", img, "stdout", "-l", lang],
-                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            if r.returncode != 0:
-                logger.warning(f"tesseract error: {r.stderr.decode(errors='ignore')[:200]}")
-                continue
-            texts.append(r.stdout.decode("utf-8", errors="ignore"))
-    finally:
-        for p in tmp_imgs:
-            remove_temp_file(p)
-    return "\n".join(texts)
 
 
 def _azure_openai_configured():
@@ -1276,11 +1245,12 @@ def _segments_from_raw(raw_segments, fallback_lang):
 
 
 def run_fallback_ocr(file_path, file_type, locale2):
-    """Run the configured fallback OCR engine for an Azure-unsupported language.
-    Returns (text, raw_segments) — raw_segments is None for the Tesseract engine."""
+    """Run the LLM OCR engine for an Azure-unsupported language (Georgian/
+    Armenian). Returns (text, raw_segments), or ('', None) when the LLM isn't
+    configured — the caller then reports no text for that language."""
     if OCR_FALLBACK == "llm" and _azure_openai_configured():
         return run_llm_ocr(file_path, file_type, locale2)
-    return run_tesseract_ocr(file_path, file_type, locale2), None
+    return "", None
 
 SUPPORTED_MIME = {
     "image/jpeg", "image/png", "image/tiff", "image/bmp",
@@ -1615,7 +1585,7 @@ class OcrResult(NamedTuple):
     confidence: float           # detection confidence (text-length-weighted)
     coverage: float             # fraction of text in the dominant language
     script_lang: Optional[str]  # language inferred from a distinct script, if any
-    used_fallback: bool         # True when the Tesseract/LLM fallback engine ran
+    used_fallback: bool         # True when the LLM fallback engine ran
     # Ordered (locale2, text) spans for a multilingual page, else None. When set,
     # synthesis reads each span with its own voice instead of one voice for all.
     segments: Optional[list] = None
