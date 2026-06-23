@@ -1536,24 +1536,32 @@ def extract_text(file_path: str, file_type: str, pinned_lang: str = None) -> Ocr
         for line in page.lines:
             extracted_text += line.content + "\n"
     normalized_text = normalize_ocr_text(extracted_text)
-    if not normalized_text.strip():
-        # Azure read nothing — try the LLM engine, which reads scripts Azure Read
-        # can't (Georgian/Armenian/...). No-op cost when LLM isn't configured.
+    locale2 = None
+    if normalized_text.strip():
+        script_lang = detect_script_language(normalized_text)
+        if script_lang and script_lang in VOICE_MAP:
+            # A distinct script is authoritative — Azure's per-line guess is
+            # unreliable for these (e.g. Georgian was detected as Thai).
+            locale2, conf, coverage = script_lang, 1.0, 1.0
+        else:
+            locale2, conf, coverage = detect_dominant_language(result)
+
+    if not normalized_text.strip() or locale2 not in VOICE_MAP:
+        # Azure Read found nothing, or what it found isn't one of our supported
+        # languages — for scripts it can't read at all (Georgian/Armenian/...) it
+        # doesn't always come back empty, it can mis-recognize the glyphs as
+        # garbage text in some other script (e.g. confidently "Javanese"). Either
+        # way, give the LLM engine a shot before sending the user to the manual
+        # picker. No-op cost when LLM isn't configured.
         if OCR_FALLBACK == "llm" and _azure_openai_configured():
             raw, raw_segments = run_llm_ocr(file_path, file_type, pinned_lang)
             text = normalize_ocr_text(raw or "")
             if text.strip():
                 dominant, segments = _segments_from_raw(raw_segments, pinned_lang or "en")
                 return OcrResult(text, ocr_pages, dominant, 1.0, 1.0, None, True, segments)
-        return OcrResult("", ocr_pages, None, 0.0, 0.0, None, False)
+        if not normalized_text.strip():
+            return OcrResult("", ocr_pages, None, 0.0, 0.0, None, False)
 
-    script_lang = detect_script_language(normalized_text)
-    if script_lang and script_lang in VOICE_MAP:
-        # A distinct script is authoritative — Azure's per-line guess is
-        # unreliable for these (e.g. Georgian was detected as Thai).
-        locale2, conf, coverage = script_lang, 1.0, 1.0
-    else:
-        locale2, conf, coverage = detect_dominant_language(result)
     segments = build_language_segments(result, locale2) if locale2 else None
     return OcrResult(normalized_text, ocr_pages, locale2, conf, coverage,
                      script_lang, False, segments)
