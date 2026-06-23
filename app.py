@@ -905,14 +905,9 @@ def detect_dominant_language(result):
     return best, confidence, coverage
 
 
-def detect_script_language(text):
-    """Infer language from the dominant Unicode script of the OCR text.
-
-    Reliable for scripts that map 1:1 to a language (Georgian, Armenian, Greek,
-    Hebrew, Thai, Devanagari, Hangul, Japanese kana). Returns a 2-letter code,
-    or None for shared scripts (Latin/Cyrillic/Arabic) where the script can't
-    distinguish the language — those defer to Azure's language detection.
-    """
+def _script_shares(text):
+    """Share of alphabetic characters in each distinct-alphabet script (Georgian,
+    Armenian, Greek, ...), keyed by language code. (share, total_letters)."""
     counts = defaultdict(int)
     letters = 0
     for ch in text:
@@ -924,18 +919,61 @@ def detect_script_language(text):
             if any(lo <= o <= hi for lo, hi in ranges):
                 counts[lang] += 1
                 break
-    if letters == 0 or not counts:
-        return None
+    if letters == 0:
+        return {}, 0
     # CJK Han is shared: Japanese if any kana is present, otherwise Chinese.
     if counts.get("han"):
         if counts.get("ja"):
             counts["ja"] += counts.pop("han")
         else:
             counts["zh"] = counts.pop("han")
-    best = max(counts, key=counts.get)
-    if counts[best] / letters >= 0.5:
+    return {lang: cnt / letters for lang, cnt in counts.items()}, letters
+
+
+def detect_script_language(text):
+    """Infer language from the dominant Unicode script of the OCR text.
+
+    Reliable for scripts that map 1:1 to a language (Georgian, Armenian, Greek,
+    Hebrew, Thai, Devanagari, Hangul, Japanese kana). Returns a 2-letter code,
+    or None for shared scripts (Latin/Cyrillic/Arabic) where the script can't
+    distinguish the language — those defer to Azure's language detection.
+    """
+    shares, letters = _script_shares(text)
+    if not shares:
+        return None
+    best = max(shares, key=shares.get)
+    if shares[best] >= 0.5:
         return best
     return None
+
+
+def _has_hidden_distinct_script(text, dominant):
+    """True if a meaningful share of the text is in a distinct-alphabet script
+    (Georgian, Armenian, ...) other than the dominant language — even when it
+    didn't win the 50% majority needed for detect_script_language to override,
+    and even when Azure's per-line language tagger never assigned it a
+    language at all. Untagged spans silently inherit the surrounding
+    language in build_language_segments, which hides exactly this case (e.g. a
+    Georgian+English side-by-side contract where Azure tagged ~97% 'en' and
+    left the Georgian column untagged)."""
+    shares, _ = _script_shares(text)
+    return any(lang != dominant and share >= MULTI_LANG_MIN_SHARE
+               for lang, share in shares.items())
+
+
+_SCRIPT_RANGE_LANGS = {lang for lang, _ in SCRIPT_RANGES} | {"zh"}
+
+
+def _segment_script_matches(locale2, text):
+    """True unless locale2 is a distinct-alphabet language (Georgian, Thai,
+    Korean, ...) whose own script doesn't actually appear in this segment's
+    text — i.e. Azure's per-line tag is provably wrong for its own claimed
+    alphabet. Shared-script languages (Latin/Cyrillic, no SCRIPT_RANGES entry)
+    always pass: there's no independent script signal to check them against,
+    and that's exactly where real multilingual pages (kk+ru+en, etc.) live."""
+    if locale2 not in _SCRIPT_RANGE_LANGS:
+        return True
+    return detect_script_language(text) == locale2
 
 
 # A secondary language must cover at least this share of the page before we treat
@@ -1062,6 +1100,85 @@ def _pdf_to_png_bytes(file_path, max_pages):
     finally:
         doc.close()
     return out
+
+
+# --- Detecting text Azure Read silently dropped (unreadable scripts) ---
+# Azure prebuilt-read omits text in scripts it can't read (Georgian/Armenian)
+# with NO trace in the result when the page also has a readable language — a
+# bilingual Georgian+English contract comes back as clean, confident English.
+# The only signal is in the pixels: ink the OCR never covered with a word box.
+INK_DARK_THRESHOLD = 140        # grayscale value below which a pixel counts as ink
+UNREAD_INK_MIN_FRACTION = 0.30  # share of ink left unrecognized that means dropped text
+_INK_SCAN_MAX_DIM = 1600        # downscale longest side before scanning (scale-invariant)
+_INK_MASK_DILATE = 7            # grow recognized boxes a few px to absorb anti-aliasing
+_INK_SCAN_DPI = 150             # PDF rasterization DPI for the scan
+
+
+def _ink_scan_eligible(file_type, ocr_pages):
+    """Only scan images and PDFs small enough that the LLM could rescue them
+    anyway — a huge PDF is almost always digital text Azure read in full."""
+    if file_type != "pdf":
+        return True
+    return bool(ocr_pages) and ocr_pages <= LLM_OCR_MAX_PDF_PAGES
+
+
+def _ink_scan_pages(file_path, file_type):
+    """Yield (grayscale PIL image, page_index) for each page to scan."""
+    from PIL import Image
+    if file_type == "pdf":
+        import fitz
+        doc = fitz.open(file_path)
+        try:
+            for i in range(doc.page_count):
+                pm = doc.load_page(i).get_pixmap(dpi=_INK_SCAN_DPI)
+                img = Image.frombytes(
+                    "RGB" if pm.n >= 3 else "L", (pm.width, pm.height), pm.samples)
+                yield img.convert("L"), i
+        finally:
+            doc.close()
+    else:
+        yield Image.open(file_path).convert("L"), 0
+
+
+def _unread_ink_fraction(file_path, file_type, result):
+    """Fraction of dark, text-like pixels that fall outside every word box Azure
+    Read recognized — across pages, the worst page wins. High only when Azure
+    silently dropped a chunk of the page (a script it can't read). Returns 0.0 on
+    any error so a scan failure can never break the OCR flow."""
+    try:
+        from PIL import Image, ImageDraw, ImageFilter, ImageChops
+        pages = list(result.pages or [])
+        worst = 0.0
+        for img, idx in _ink_scan_pages(file_path, file_type):
+            if idx >= len(pages):
+                break
+            page = pages[idx]
+            scale = min(1.0, _INK_SCAN_MAX_DIM / max(img.size))
+            if scale < 1.0:
+                img = img.resize((max(1, int(img.size[0] * scale)),
+                                  max(1, int(img.size[1] * scale))))
+            W, H = img.size
+            sx = W / (page.width or W)
+            sy = H / (page.height or H)
+            ink = img.point(lambda p: 255 if p < INK_DARK_THRESHOLD else 0, mode="L")
+            total_ink = ink.histogram()[255]
+            if not total_ink:
+                continue
+            mask = Image.new("L", (W, H), 0)
+            draw = ImageDraw.Draw(mask)
+            for w in (getattr(page, "words", None) or []):
+                poly = w.polygon or []
+                if len(poly) < 6:
+                    continue
+                draw.polygon([(poly[i] * sx, poly[i + 1] * sy)
+                              for i in range(0, len(poly), 2)], fill=255)
+            mask = mask.filter(ImageFilter.MaxFilter(_INK_MASK_DILATE))
+            inside_ink = ImageChops.multiply(ink, mask).histogram()[255]
+            worst = max(worst, (total_ink - inside_ink) / total_ink)
+        return worst
+    except Exception as ex:
+        logger.warning(f"unread-ink scan failed: {ex!r}")
+        return 0.0
 
 
 LLM_OCR_PROMPT = (
@@ -1546,23 +1663,42 @@ def extract_text(file_path: str, file_type: str, pinned_lang: str = None) -> Ocr
         else:
             locale2, conf, coverage = detect_dominant_language(result)
 
-    if not normalized_text.strip() or locale2 not in VOICE_MAP:
-        # Azure Read found nothing, or what it found isn't one of our supported
-        # languages — for scripts it can't read at all (Georgian/Armenian/...) it
-        # doesn't always come back empty, it can mis-recognize the glyphs as
-        # garbage text in some other script (e.g. confidently "Javanese"). Either
-        # way, give the LLM engine a shot before sending the user to the manual
-        # picker. No-op cost when LLM isn't configured.
+    segments = build_language_segments(result, locale2) if locale2 else None
+    suspect_segment = segments and any(
+        not _segment_script_matches(loc, text) for loc, text in segments)
+    hidden_script = bool(locale2) and _has_hidden_distinct_script(normalized_text, locale2)
+
+    # Reasons to distrust Azure's result and try the LLM engine:
+    #  - it found nothing, or what it found isn't a language we have a voice for;
+    #  - it tagged a span as a distinct-alphabet language whose own script isn't
+    #    actually there (a Georgian page coming back tagged Thai+English+Indo);
+    #  - a chunk of the extracted text is in a distinct script it never tagged.
+    # Real multilingual Latin/Cyrillic pairs (kk+ru+en etc.) have no script to
+    # mismatch and are left alone.
+    needs_rescue = (not normalized_text.strip() or locale2 not in VOICE_MAP
+                    or suspect_segment or hidden_script)
+
+    # Last resort, and the only signal for the worst case: Azure can silently
+    # DROP text in a script it can't read when the page also has a readable
+    # language, leaving NO trace in the result (a Georgian+English contract
+    # comes back as clean, confident English with the Georgian column simply
+    # gone). Catch it by scanning the image for text-like ink Azure never
+    # covered with a word box. Only worth the pixels when the LLM can rescue.
+    if (not needs_rescue and OCR_FALLBACK == "llm" and _azure_openai_configured()
+            and _ink_scan_eligible(file_type, ocr_pages)
+            and _unread_ink_fraction(file_path, file_type, result) >= UNREAD_INK_MIN_FRACTION):
+        needs_rescue = True
+
+    if needs_rescue:
         if OCR_FALLBACK == "llm" and _azure_openai_configured():
             raw, raw_segments = run_llm_ocr(file_path, file_type, pinned_lang)
             text = normalize_ocr_text(raw or "")
             if text.strip():
-                dominant, segments = _segments_from_raw(raw_segments, pinned_lang or "en")
-                return OcrResult(text, ocr_pages, dominant, 1.0, 1.0, None, True, segments)
+                dominant, rescued_segments = _segments_from_raw(raw_segments, pinned_lang or "en")
+                return OcrResult(text, ocr_pages, dominant, 1.0, 1.0, None, True, rescued_segments)
         if not normalized_text.strip():
             return OcrResult("", ocr_pages, None, 0.0, 0.0, None, False)
 
-    segments = build_language_segments(result, locale2) if locale2 else None
     return OcrResult(normalized_text, ocr_pages, locale2, conf, coverage,
                      script_lang, False, segments)
 

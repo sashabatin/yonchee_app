@@ -9,5 +9,6 @@ anthropic>=0.39,<1.0
 num2words>=0.5,<1.0  # spell out large numbers for natural TTS (e.g. Ukrainian)
 openai>=1.40,<2.0       # Azure OpenAI vision client for the LLM OCR fallback (ka/hy)
 pymupdf>=1.24,<2.0      # PDF -> image rasterization for LLM OCR (replaces poppler)
+pillow>=10.0,<13        # image ink-coverage scan: detect text Azure Read silently dropped
 
 # System requirement: ffmpeg must be installed and available in PATH
