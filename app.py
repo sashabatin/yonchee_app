@@ -190,7 +190,9 @@ MESSAGES = {
         "limits_status": "📊 Лимиты\n\nБесплатно сегодня: {free_left}/{free_total}\nБонусные запросы: {bonus_left}\nБонус действует до: {bonus_until}",
         "limit_reached": "⚠️ На сегодня бесплатный лимит исчерпан и бонусные запросы закончились. Возвращайтесь завтра или поддержите проект для дополнительных запросов.",
         "mission_intro": "☕ Финансирование доступности\n\nYonchee создан, чтобы помогать людям, которым сложно читать. Название связано с Иваном (Yonchee): в юности у него значительно ухудшилось зрение, и это стало отправной точкой идеи продукта.",
-        "mission_short_audio": "Yonchee помогает людям, которым сложно читать, превращая фото и PDF в голосовые сообщения внутри Telegram.",
+        # Audio-only (never displayed): Latin tokens are spelled phonetically so the
+        # Russian neural voice doesn't mangle them (PDF -> "пи-ди-эф", brand -> "Йончи").
+        "mission_short_audio": "Йончи помогает людям, которым сложно читать, превращая фото и пи-ди-эф в голосовые сообщения внутри Телеграма.",
         "onboarding_start_button": "🚀 Начать",
         "onboarding_listen_button": "🔊 Прослушать миссию",
         "onboarding_support_button": "💙 Поддержать проект (донат)",
