@@ -345,8 +345,8 @@ def main():
         write_case(cases, f"gen-mixed-{a}-{b}", img, text, None, f"mixed {a}+{b}")
 
 # Number-heavy cases (clean + one mild-degraded) for the Azure-OCR languages.
-    # Georgian (ka) is omitted here — it goes through the Tesseract fallback, which
-    # isn't available locally; use run_tts.py --numbers to hear the ka voice.
+    # Georgian (ka) is omitted here — it goes through the Azure OpenAI LLM-OCR
+    # fallback, which needs cloud config; use run_tts.py --numbers to hear the ka voice.
     for lang in ["en", "ru", "uk"]:
         text = NUMBER_TEXTS[lang]
         font = get_font(font_paths(lang)[0], 34)

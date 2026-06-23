@@ -2,12 +2,11 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# System deps: ffmpeg (audio), tesseract + Georgian/Armenian data and poppler
-# (fallback OCR for scripts Azure Read can't extract).
+# System deps: ffmpeg for audio encoding. OCR for scripts Azure Read can't
+# extract (Georgian/Armenian) now goes through Azure OpenAI vision, and PDFs
+# are rasterized in-process via PyMuPDF — no tesseract/poppler needed.
 RUN apt-get update && apt-get install -y \
         ffmpeg \
-        tesseract-ocr tesseract-ocr-kat tesseract-ocr-hye \
-        poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
