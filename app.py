@@ -9,7 +9,7 @@ import platform
 import time
 import html
 from datetime import datetime, timedelta
-from collections import defaultdict
+from collections import defaultdict, deque
 from typing import NamedTuple, Optional
 from dotenv import load_dotenv
 
@@ -18,10 +18,10 @@ try:
 except ImportError:
     AzureLogHandler = None
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler,
-    ContextTypes, filters
+    ContextTypes, filters, TypeHandler, ApplicationHandlerStop
 )
 from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.ai.documentintelligence.models import DocumentAnalysisFeature
@@ -483,13 +483,54 @@ WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
 BOT_ENV = os.environ.get("BOT_ENV", "local")
 AZURE_STORAGE_CONNECTION_STRING = os.environ.get("AZURE_STORAGE_CONNECTION_STRING", "")
 ADMIN_USER_IDS = {x.strip() for x in os.environ.get("ADMIN_USER_IDS", "").split(",") if x.strip()}
+# User IDs that bypass all daily/bonus limits (e.g. owner, testers). Admins are unlimited too.
+UNLIMITED_USER_IDS = {x.strip() for x in os.environ.get("UNLIMITED_USER_IDS", "").split(",") if x.strip()}
 OCR_FALLBACK = os.environ.get("OCR_FALLBACK", "tesseract").strip().lower()  # tesseract | llm
 SUPPORT_PAYMENT_MODE = os.environ.get("SUPPORT_PAYMENT_MODE", "admin_stub").strip().lower()  # instant | admin_stub
 
 
 def _is_admin(update) -> bool:
-    """True only for user IDs listed in the ADMIN_USER_IDS env var."""
-    return bool(ADMIN_USER_IDS) and str(update.effective_user.id) in ADMIN_USER_IDS
+    """True only for ADMIN_USER_IDS, and only in a private (DM) chat.
+
+    Fail-closed: returns False when ADMIN_USER_IDS is unset, when there's no
+    effective user (e.g. channel posts), or when the action happens anywhere
+    other than the admin's own private chat — so admin replies (which may list
+    granted user IDs) can never surface in a group the bot was added to.
+    """
+    user = update.effective_user
+    chat = update.effective_chat
+    if not ADMIN_USER_IDS or user is None or chat is None:
+        return False
+    if chat.type != "private":
+        return False
+    return str(user.id) in ADMIN_USER_IDS
+
+
+def _is_unlimited(user_id) -> bool:
+    """True for IDs in UNLIMITED_USER_IDS (and any admin) — bypasses all quota limits."""
+    uid = str(user_id)
+    return uid in UNLIMITED_USER_IDS or uid in ADMIN_USER_IDS
+
+
+# Bounded de-dupe of Telegram update_ids. With webhook + scale-to-zero, a cold start
+# (~10-15 s) makes Telegram time out and re-deliver the same update several times; once
+# the container is warm all the retries arrive and would each be processed. We drop any
+# update_id we've already handled in this process.
+_seen_update_ids = deque(maxlen=2048)
+_seen_update_set = set()
+
+
+async def _dedupe_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    upd_id = getattr(update, "update_id", None)
+    if upd_id is None:
+        return
+    if upd_id in _seen_update_set:
+        logger.info(f"Dropping duplicate update_id={upd_id}")
+        raise ApplicationHandlerStop
+    if len(_seen_update_ids) == _seen_update_ids.maxlen:
+        _seen_update_set.discard(_seen_update_ids[0])  # evicted by the append below
+    _seen_update_ids.append(upd_id)
+    _seen_update_set.add(upd_id)
 
 
 def log_usage(user_id: int, status: str, reason: str = None, language: str = None,
@@ -588,6 +629,16 @@ class _MemoryStore:
         u["bonus_credits"] = str(max(0, int(bonus_credits or 0)))
         u["bonus_until"] = bonus_until or ""
 
+    def set_unlimited(self, user_id, on):
+        u = self._d.setdefault(user_id, {})
+        if on:
+            u["unlimited"] = "1"
+        else:
+            u.pop("unlimited", None)
+
+    def list_unlimited_users(self):
+        return [str(uid) for uid, u in self._d.items() if str(u.get("unlimited") or "") == "1"]
+
     def set_default_lang(self, user_id, locale2):
         u = self._d.setdefault(user_id, {})
         if locale2:
@@ -635,7 +686,8 @@ class _TableStore:
                     "quota_day": e.get("quota_day") or "",
                     "daily_used": e.get("daily_used") or "0",
                     "bonus_credits": e.get("bonus_credits") or "0",
-                    "bonus_until": e.get("bonus_until") or ""}
+                    "bonus_until": e.get("bonus_until") or "",
+                    "unlimited": e.get("unlimited") or ""}
         except ResourceNotFoundError:
             return {}
         except Exception as ex:
@@ -671,6 +723,18 @@ class _TableStore:
     def set_awaiting_feedback(self, user_id, on):
         # Persisted so a /feedback prompt survives scale-to-zero and replica switches.
         self._upsert(user_id, awaiting_fb=int(time.time()) if on else 0)
+
+    def set_unlimited(self, user_id, on):
+        self._upsert(user_id, unlimited="1" if on else "")
+
+    def list_unlimited_users(self):
+        try:
+            items = self._client.query_entities(
+                f"PartitionKey eq '{STORE_PARTITION}' and unlimited eq '1'")
+            return [e.get("RowKey") for e in items]
+        except Exception as ex:
+            logger.warning(f"list_unlimited_users failed: {ex!r}")
+            return []
 
     def add_feedback(self, user_id, username, ui_lang, text):
         ts = int(time.time() * 1000)
@@ -1025,6 +1089,18 @@ def _load_quota(user_id: int):
         except Exception as ex:
             logger.warning(f"set_quota_state failed: {ex!r}")
 
+    unlimited = _is_unlimited(user_id) or str(raw.get("unlimited") or "") == "1"
+    if unlimited:
+        return {
+            "quota_day": quota_day,
+            "daily_used": daily_used,
+            "free_left": "∞",
+            "free_total": "∞",
+            "bonus_credits": "∞",
+            "bonus_until": bonus_until or "-",
+            "unlimited": True,
+        }
+
     free_left = max(0, FREE_DAILY_LIMIT - daily_used)
     return {
         "quota_day": quota_day,
@@ -1033,14 +1109,15 @@ def _load_quota(user_id: int):
         "free_total": FREE_DAILY_LIMIT,
         "bonus_credits": bonus_credits,
         "bonus_until": bonus_until,
+        "unlimited": False,
     }
 
 
 def _consume_quota(user_id: int, cost: int = 1):
     """Spend daily free quota first, then bonus credits. Returns (ok, snapshot)."""
-    if cost <= 0:
-        return True, _load_quota(user_id)
     snap = _load_quota(user_id)
+    if cost <= 0 or snap.get("unlimited"):
+        return True, snap
     free_left = snap["free_left"]
     bonus = snap["bonus_credits"]
 
@@ -1133,7 +1210,9 @@ async def _keep_typing(bot, chat_id: int, stop: asyncio.Event) -> None:
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
     logger.info(f"User {user_id} requested help")
-    await update.message.reply_text(t(update, "help"))
+    # ReplyKeyboardRemove clears the legacy 1/2/3 language reply-keyboard left over
+    # from an older version (current UI uses inline buttons). No-op for new users.
+    await update.message.reply_text(t(update, "help"), reply_markup=ReplyKeyboardRemove())
 
 
 async def limits_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1277,7 +1356,10 @@ async def _process_file_payload(
     """Download → OCR/detect → synthesize flow for an accepted file payload."""
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
-    status_message = await context.bot.send_message(chat_id, t(update, "analyzing"))
+    # reply_markup also clears the legacy 1/2/3 language reply-keyboard from older
+    # versions so it disappears on the user's next file (no-op if they never had it).
+    status_message = await context.bot.send_message(
+        chat_id, t(update, "analyzing"), reply_markup=ReplyKeyboardRemove())
     stop_typing = asyncio.Event()
     typing_task = asyncio.create_task(_keep_typing(context.bot, chat_id, stop_typing))
     file_path = None
@@ -1855,6 +1937,80 @@ async def on_support_admin_callback(update: Update, context: ContextTypes.DEFAUL
         await query.edit_message_text(f"Rejected: user {target_user_id}, pack {pack_key}.")
 
 
+def _build_unlimited_list(ui_chrome: bool = True):
+    """Return (text, keyboard) listing store-granted unlimited users with revoke buttons.
+
+    Note: IDs granted via the ADMIN_USER_IDS / UNLIMITED_USER_IDS env vars are also
+    unlimited but are not listed here — they're managed by deployment config, not buttons.
+    """
+    try:
+        ids = list(user_store.list_unlimited_users())
+    except Exception as ex:
+        logger.warning(f"list_unlimited_users failed: {ex!r}")
+        ids = []
+    rows = [[InlineKeyboardButton(f"🚫 Revoke {uid}", callback_data=f"unlim:revoke:{uid}")]
+            for uid in ids]
+    if ids:
+        text = "♾ Unlimited users (tap to revoke):\n" + "\n".join(f"• {u}" for u in ids)
+    else:
+        text = "♾ No unlimited users granted yet."
+    if ui_chrome:
+        text += "\n\nGrant access with:  /unlimited <user_id>"
+    return text, (InlineKeyboardMarkup(rows) if rows else None)
+
+
+async def unlimited_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Admin-only: grant/list unlimited (no-limit) access. /unlimited <id> grants;
+    /unlimited alone lists current grants with inline revoke buttons."""
+    if not _is_admin(update):
+        await update.message.reply_text(t(update, "help"))
+        return
+    arg = context.args[0].strip() if context.args else ""
+    if arg:
+        if not arg.isdigit():
+            await update.message.reply_text("Usage: /unlimited <numeric user_id>")
+            return
+        try:
+            user_store.set_unlimited(int(arg), True)
+        except Exception as ex:
+            logger.warning(f"set_unlimited grant failed: {ex!r}")
+            await update.message.reply_text("⚠️ Failed to grant, try again.")
+            return
+        log_growth_event(int(arg), event_type="unlimited_granted", source="admin")
+        await update.message.reply_text(
+            f"✅ Unlimited access granted to {arg}.",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton(f"🚫 Revoke {arg}", callback_data=f"unlim:revoke:{arg}")
+            ]]),
+        )
+        return
+    text, kb = _build_unlimited_list()
+    await update.message.reply_text(text, reply_markup=kb)
+
+
+async def on_unlimited_admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+    if not _is_admin(update):
+        await context.bot.send_message(update.effective_chat.id, t(update, "help"))
+        return
+    parts = (query.data or "").split(":")
+    if len(parts) != 3 or parts[0] != "unlim" or not parts[2].isdigit():
+        return
+    action, uid = parts[1], parts[2]
+    on = (action == "grant")
+    try:
+        user_store.set_unlimited(int(uid), on)
+    except Exception as ex:
+        logger.warning(f"set_unlimited toggle failed: {ex!r}")
+        await query.answer("Failed, try again.", show_alert=True)
+        return
+    log_growth_event(int(uid), event_type=("unlimited_granted" if on else "unlimited_revoked"),
+                     source="admin")
+    text, kb = _build_unlimited_list()
+    await query.edit_message_text(text, reply_markup=kb)
+
+
 async def feedback_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = " ".join(context.args).strip() if context.args else ""
     if text:
@@ -1902,7 +2058,9 @@ async def on_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 logger.warning(f"clear awaiting_fb failed: {ex!r}")
             await _save_feedback(update, context, text)
             return
-    await update.message.reply_text(t(update, "help"))
+    # Also clears the legacy 1/2/3 language reply-keyboard if the user still has it
+    # (tapping those stale buttons sends plain text and lands here).
+    await update.message.reply_text(t(update, "help"), reply_markup=ReplyKeyboardRemove())
 
 
 async def feedback_recent_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2011,6 +2169,7 @@ async def _post_init(application) -> None:
     # Admins also see the owner-only commands in their personal menu (scoped by chat),
     # so they're discoverable without exposing them to regular users.
     admin_cmds = public_cmds + [
+        BotCommand("unlimited", "Admin: grant/list unlimited access"),
         BotCommand("feedback_recent", "Admin: last 10 feedback"),
         BotCommand("feedback_stats", "Admin: feedback stats"),
         BotCommand("feedback_digest", "Admin: AI improvement digest"),
@@ -2034,12 +2193,15 @@ def main() -> None:
         .post_init(_post_init)
         .build()
     )
+    # Runs before everything (group=-1): drop duplicate webhook re-deliveries.
+    app.add_handler(TypeHandler(Update, _dedupe_update), group=-1)
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("limits", limits_command))
     app.add_handler(CommandHandler("support", support_command))
     app.add_handler(CommandHandler("language", language_command))
     app.add_handler(CommandHandler("feedback", feedback_command))
+    app.add_handler(CommandHandler("unlimited", unlimited_command))
     app.add_handler(CommandHandler("feedback_recent", feedback_recent_command))
     app.add_handler(CommandHandler("feedback_stats", feedback_stats_command))
     app.add_handler(CommandHandler("feedback_digest", feedback_digest_command))
@@ -2049,6 +2211,7 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(on_precost_callback, pattern=r"^pre:"))
     app.add_handler(CallbackQueryHandler(on_support_callback, pattern=r"^sup:"))
     app.add_handler(CallbackQueryHandler(on_support_admin_callback, pattern=r"^supadm:"))
+    app.add_handler(CallbackQueryHandler(on_unlimited_admin_callback, pattern=r"^unlim:"))
     app.add_handler(CallbackQueryHandler(on_setlang_callback, pattern=r"^setlang:"))
     app.add_handler(CallbackQueryHandler(on_language_callback, pattern=r"^lang:"))
 
