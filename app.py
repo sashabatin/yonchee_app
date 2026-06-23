@@ -1559,6 +1559,22 @@ def extract_text(file_path: str, file_type: str, pinned_lang: str = None) -> Ocr
                      script_lang, False, segments)
 
 
+async def _safe_edit_text(message, text, **kwargs):
+    """Edit a status message without letting a Telegram edit failure abort the
+    flow. A cold-start update redelivery can leave a just-sent status message
+    momentarily non-editable ("Message can't be edited") — but a failed cosmetic
+    status update must never stop us from delivering the OCR audio. Falls back to
+    a fresh message so any attached keyboard/menu still reaches the user."""
+    try:
+        await message.edit_text(text, **kwargs)
+    except Exception as ex:
+        logger.warning(f"status edit_text failed, sending fresh message: {ex!r}")
+        try:
+            await message.chat.send_message(text, **kwargs)
+        except Exception as ex2:
+            logger.warning(f"status fallback send_message failed: {ex2!r}")
+
+
 async def _process_file_payload(
         update: Update,
         context: ContextTypes.DEFAULT_TYPE,
@@ -1591,7 +1607,7 @@ async def _process_file_payload(
             normalized_text = ocr.text
             ocr_ms = round((time.monotonic() - t0) * 1000)
             if not normalized_text.strip():
-                await status_message.edit_text(t(update, "no_text"))
+                await _safe_edit_text(status_message,t(update, "no_text"))
                 await context.bot.send_message(chat_id, t(update, "help"))
                 log_usage(user_id, status="failure", reason="no_text_fallback",
                           file_type=file_type, file_size_kb=file_size_kb, duration_ms=ocr_ms,
@@ -1602,7 +1618,7 @@ async def _process_file_payload(
                 "file_type": file_type, "file_size_kb": file_size_kb, "cost_credits": cost_credits,
             }
             info = VOICE_MAP[default_lang]
-            await status_message.edit_text(
+            await _safe_edit_text(status_message,
                 t(update, "using_default").format(lang=f'{info["flag"]} {info["name"]}')
             )
             stop_typing.set()
@@ -1617,7 +1633,7 @@ async def _process_file_payload(
 
         if not normalized_text.strip():
             logger.info(f"User {user_id} uploaded a file with no detectable text")
-            await status_message.edit_text(t(update, "no_text"))
+            await _safe_edit_text(status_message,t(update, "no_text"))
             await context.bot.send_message(chat_id, t(update, "help"))
             log_usage(user_id, status="failure", reason="no_text", ocr_pages=ocr_pages,
                       file_type=file_type, file_size_kb=file_size_kb, duration_ms=ocr_ms,
@@ -1634,7 +1650,7 @@ async def _process_file_payload(
 
         if default_lang in VOICE_MAP:
             info = VOICE_MAP[default_lang]
-            await status_message.edit_text(
+            await _safe_edit_text(status_message,
                 t(update, "using_default").format(lang=f'{info["flag"]} {info["name"]}')
             )
             stop_typing.set()
@@ -1648,21 +1664,21 @@ async def _process_file_payload(
                     seg_locs.append(loc)
             label = " + ".join(f'{VOICE_MAP[l]["flag"]} {VOICE_MAP[l]["name"]}'
                                for l in seg_locs if l in VOICE_MAP)
-            await status_message.edit_text(t(update, "detected_lang").format(lang=label))
+            await _safe_edit_text(status_message,t(update, "detected_lang").format(lang=label))
             stop_typing.set()
             await synthesize_and_send(update, context, locale2, status_message=None,
                                       use_segments=True)
         elif (locale2 in VOICE_MAP and conf >= AUTO_DETECT_MIN_CONFIDENCE
                 and coverage >= AUTO_DETECT_MIN_COVERAGE):
             info = VOICE_MAP[locale2]
-            await status_message.edit_text(
+            await _safe_edit_text(status_message,
                 t(update, "detected_lang").format(lang=f'{info["flag"]} {info["name"]}')
             )
             stop_typing.set()
             await synthesize_and_send(update, context, locale2, status_message=None)
         else:
             recent = [c for c in prefs.get("recent", "").split(",") if c]
-            await status_message.edit_text(
+            await _safe_edit_text(status_message,
                 t(update, "choose_language"),
                 reply_markup=build_language_keyboard(update, locale2, recent)
             )
@@ -1670,7 +1686,7 @@ async def _process_file_payload(
         logger.error(f"OCR/handle exception for user {user_id}: {e!r}")
         logger.error(traceback.format_exc())
         try:
-            await status_message.edit_text(t(update, "generic_error"))
+            await _safe_edit_text(status_message,t(update, "generic_error"))
         except Exception:
             await context.bot.send_message(chat_id, t(update, "generic_error"))
         await context.bot.send_message(chat_id, t(update, "help"))
@@ -1908,7 +1924,7 @@ async def synthesize_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE
     try:
         if status_message is not None:
             try:
-                await status_message.edit_text(t(update, "generating_audio").format(lang=lang_label))
+                await _safe_edit_text(status_message,t(update, "generating_audio").format(lang=lang_label))
             except Exception:
                 status_message = None
         if status_message is None:
