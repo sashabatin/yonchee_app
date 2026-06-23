@@ -905,14 +905,9 @@ def detect_dominant_language(result):
     return best, confidence, coverage
 
 
-def detect_script_language(text):
-    """Infer language from the dominant Unicode script of the OCR text.
-
-    Reliable for scripts that map 1:1 to a language (Georgian, Armenian, Greek,
-    Hebrew, Thai, Devanagari, Hangul, Japanese kana). Returns a 2-letter code,
-    or None for shared scripts (Latin/Cyrillic/Arabic) where the script can't
-    distinguish the language — those defer to Azure's language detection.
-    """
+def _script_shares(text):
+    """Share of alphabetic characters in each distinct-alphabet script (Georgian,
+    Armenian, Greek, ...), keyed by language code. (share, total_letters)."""
     counts = defaultdict(int)
     letters = 0
     for ch in text:
@@ -924,18 +919,46 @@ def detect_script_language(text):
             if any(lo <= o <= hi for lo, hi in ranges):
                 counts[lang] += 1
                 break
-    if letters == 0 or not counts:
-        return None
+    if letters == 0:
+        return {}, 0
     # CJK Han is shared: Japanese if any kana is present, otherwise Chinese.
     if counts.get("han"):
         if counts.get("ja"):
             counts["ja"] += counts.pop("han")
         else:
             counts["zh"] = counts.pop("han")
-    best = max(counts, key=counts.get)
-    if counts[best] / letters >= 0.5:
+    return {lang: cnt / letters for lang, cnt in counts.items()}, letters
+
+
+def detect_script_language(text):
+    """Infer language from the dominant Unicode script of the OCR text.
+
+    Reliable for scripts that map 1:1 to a language (Georgian, Armenian, Greek,
+    Hebrew, Thai, Devanagari, Hangul, Japanese kana). Returns a 2-letter code,
+    or None for shared scripts (Latin/Cyrillic/Arabic) where the script can't
+    distinguish the language — those defer to Azure's language detection.
+    """
+    shares, letters = _script_shares(text)
+    if not shares:
+        return None
+    best = max(shares, key=shares.get)
+    if shares[best] >= 0.5:
         return best
     return None
+
+
+def _has_hidden_distinct_script(text, dominant):
+    """True if a meaningful share of the text is in a distinct-alphabet script
+    (Georgian, Armenian, ...) other than the dominant language — even when it
+    didn't win the 50% majority needed for detect_script_language to override,
+    and even when Azure's per-line language tagger never assigned it a
+    language at all. Untagged spans silently inherit the surrounding
+    language in build_language_segments, which hides exactly this case (e.g. a
+    Georgian+English side-by-side contract where Azure tagged ~97% 'en' and
+    left the Georgian column untagged)."""
+    shares, _ = _script_shares(text)
+    return any(lang != dominant and share >= MULTI_LANG_MIN_SHARE
+               for lang, share in shares.items())
 
 
 _SCRIPT_RANGE_LANGS = {lang for lang, _ in SCRIPT_RANGES} | {"zh"}
@@ -1564,15 +1587,20 @@ def extract_text(file_path: str, file_type: str, pinned_lang: str = None) -> Ocr
     segments = build_language_segments(result, locale2) if locale2 else None
     suspect_segment = segments and any(
         not _segment_script_matches(loc, text) for loc, text in segments)
+    hidden_script = bool(locale2) and _has_hidden_distinct_script(normalized_text, locale2)
 
-    if not normalized_text.strip() or locale2 not in VOICE_MAP or suspect_segment:
+    if not normalized_text.strip() or locale2 not in VOICE_MAP or suspect_segment or hidden_script:
         # Azure Read found nothing, what it found isn't one of our supported
-        # languages, or it tagged a span as a distinct-alphabet language whose
+        # languages, it tagged a span as a distinct-alphabet language whose
         # own script doesn't match (e.g. a Georgian page coming back tagged
-        # Thai+English+Indonesian — the "th" span isn't actually Thai script).
-        # Real multilingual Latin/Cyrillic pairs (kk+ru+en etc.) have no script
-        # to mismatch and are left alone. Either way, give the LLM engine a
-        # shot before trusting this result. No-op cost when LLM isn't configured.
+        # Thai+English+Indonesian — the "th" span isn't actually Thai script),
+        # or a meaningful chunk of the raw text is in a distinct script Azure
+        # never tagged at all (e.g. a Georgian+English side-by-side contract
+        # coming back as 97% "en" — the Georgian column was simply left
+        # untagged and silently inherited the English label). Real
+        # multilingual Latin/Cyrillic pairs (kk+ru+en etc.) have no script to
+        # mismatch and are left alone. Either way, give the LLM engine a shot
+        # before trusting this result. No-op cost when LLM isn't configured.
         if OCR_FALLBACK == "llm" and _azure_openai_configured():
             raw, raw_segments = run_llm_ocr(file_path, file_type, pinned_lang)
             text = normalize_ocr_text(raw or "")

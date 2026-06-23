@@ -141,6 +141,27 @@ def run():
     check("genuine 3-language kk+ru+en page is not rescued",
           result3.segments is not None and len({loc for loc, _ in result3.segments}) == 3)
 
+    # The original motivating bug: a side-by-side Georgian+English contract.
+    # Azure tags only the English column and leaves the Georgian column
+    # completely untagged (no language span at all, not even a wrong one) —
+    # build_language_segments has nothing to split on, so it silently
+    # inherits "en" everywhere and reports a clean monolingual English page.
+    ka_text = "ა" * 20
+    en_text = "E" * 40
+    bilingual_result = _Result(ka_text + en_text, [
+        _Lang("en-US", 0.98, [(len(ka_text), len(en_text))]),
+    ])
+    with patch.object(app.doc_client, "begin_analyze_document",
+                       return_value=_Poller(bilingual_result)), \
+         patch.object(app, "run_llm_ocr",
+                       return_value=(rescued_text, [("ka", rescued_text), ("en", "the english half")])), \
+         patch.object(app, "OCR_FALLBACK", "llm"), \
+         patch.object(app, "_azure_openai_configured", return_value=True):
+        result4 = app.extract_text(fake_path, "image")
+
+    check("untagged Georgian column triggers the LLM rescue",
+          result4.used_fallback is True and result4.text.startswith(rescued_text))
+
     os.remove(fake_path)
     print()
     if failures:
