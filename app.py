@@ -1102,6 +1102,85 @@ def _pdf_to_png_bytes(file_path, max_pages):
     return out
 
 
+# --- Detecting text Azure Read silently dropped (unreadable scripts) ---
+# Azure prebuilt-read omits text in scripts it can't read (Georgian/Armenian)
+# with NO trace in the result when the page also has a readable language — a
+# bilingual Georgian+English contract comes back as clean, confident English.
+# The only signal is in the pixels: ink the OCR never covered with a word box.
+INK_DARK_THRESHOLD = 140        # grayscale value below which a pixel counts as ink
+UNREAD_INK_MIN_FRACTION = 0.30  # share of ink left unrecognized that means dropped text
+_INK_SCAN_MAX_DIM = 1600        # downscale longest side before scanning (scale-invariant)
+_INK_MASK_DILATE = 7            # grow recognized boxes a few px to absorb anti-aliasing
+_INK_SCAN_DPI = 150             # PDF rasterization DPI for the scan
+
+
+def _ink_scan_eligible(file_type, ocr_pages):
+    """Only scan images and PDFs small enough that the LLM could rescue them
+    anyway — a huge PDF is almost always digital text Azure read in full."""
+    if file_type != "pdf":
+        return True
+    return bool(ocr_pages) and ocr_pages <= LLM_OCR_MAX_PDF_PAGES
+
+
+def _ink_scan_pages(file_path, file_type):
+    """Yield (grayscale PIL image, page_index) for each page to scan."""
+    from PIL import Image
+    if file_type == "pdf":
+        import fitz
+        doc = fitz.open(file_path)
+        try:
+            for i in range(doc.page_count):
+                pm = doc.load_page(i).get_pixmap(dpi=_INK_SCAN_DPI)
+                img = Image.frombytes(
+                    "RGB" if pm.n >= 3 else "L", (pm.width, pm.height), pm.samples)
+                yield img.convert("L"), i
+        finally:
+            doc.close()
+    else:
+        yield Image.open(file_path).convert("L"), 0
+
+
+def _unread_ink_fraction(file_path, file_type, result):
+    """Fraction of dark, text-like pixels that fall outside every word box Azure
+    Read recognized — across pages, the worst page wins. High only when Azure
+    silently dropped a chunk of the page (a script it can't read). Returns 0.0 on
+    any error so a scan failure can never break the OCR flow."""
+    try:
+        from PIL import Image, ImageDraw, ImageFilter, ImageChops
+        pages = list(result.pages or [])
+        worst = 0.0
+        for img, idx in _ink_scan_pages(file_path, file_type):
+            if idx >= len(pages):
+                break
+            page = pages[idx]
+            scale = min(1.0, _INK_SCAN_MAX_DIM / max(img.size))
+            if scale < 1.0:
+                img = img.resize((max(1, int(img.size[0] * scale)),
+                                  max(1, int(img.size[1] * scale))))
+            W, H = img.size
+            sx = W / (page.width or W)
+            sy = H / (page.height or H)
+            ink = img.point(lambda p: 255 if p < INK_DARK_THRESHOLD else 0, mode="L")
+            total_ink = ink.histogram()[255]
+            if not total_ink:
+                continue
+            mask = Image.new("L", (W, H), 0)
+            draw = ImageDraw.Draw(mask)
+            for w in (getattr(page, "words", None) or []):
+                poly = w.polygon or []
+                if len(poly) < 6:
+                    continue
+                draw.polygon([(poly[i] * sx, poly[i + 1] * sy)
+                              for i in range(0, len(poly), 2)], fill=255)
+            mask = mask.filter(ImageFilter.MaxFilter(_INK_MASK_DILATE))
+            inside_ink = ImageChops.multiply(ink, mask).histogram()[255]
+            worst = max(worst, (total_ink - inside_ink) / total_ink)
+        return worst
+    except Exception as ex:
+        logger.warning(f"unread-ink scan failed: {ex!r}")
+        return 0.0
+
+
 LLM_OCR_PROMPT = (
     "You are a precise OCR engine. Transcribe ALL text in the image(s) exactly as "
     "written. Do not translate, summarize, correct, or add any commentary. "
@@ -1589,18 +1668,28 @@ def extract_text(file_path: str, file_type: str, pinned_lang: str = None) -> Ocr
         not _segment_script_matches(loc, text) for loc, text in segments)
     hidden_script = bool(locale2) and _has_hidden_distinct_script(normalized_text, locale2)
 
-    if not normalized_text.strip() or locale2 not in VOICE_MAP or suspect_segment or hidden_script:
-        # Azure Read found nothing, what it found isn't one of our supported
-        # languages, it tagged a span as a distinct-alphabet language whose
-        # own script doesn't match (e.g. a Georgian page coming back tagged
-        # Thai+English+Indonesian — the "th" span isn't actually Thai script),
-        # or a meaningful chunk of the raw text is in a distinct script Azure
-        # never tagged at all (e.g. a Georgian+English side-by-side contract
-        # coming back as 97% "en" — the Georgian column was simply left
-        # untagged and silently inherited the English label). Real
-        # multilingual Latin/Cyrillic pairs (kk+ru+en etc.) have no script to
-        # mismatch and are left alone. Either way, give the LLM engine a shot
-        # before trusting this result. No-op cost when LLM isn't configured.
+    # Reasons to distrust Azure's result and try the LLM engine:
+    #  - it found nothing, or what it found isn't a language we have a voice for;
+    #  - it tagged a span as a distinct-alphabet language whose own script isn't
+    #    actually there (a Georgian page coming back tagged Thai+English+Indo);
+    #  - a chunk of the extracted text is in a distinct script it never tagged.
+    # Real multilingual Latin/Cyrillic pairs (kk+ru+en etc.) have no script to
+    # mismatch and are left alone.
+    needs_rescue = (not normalized_text.strip() or locale2 not in VOICE_MAP
+                    or suspect_segment or hidden_script)
+
+    # Last resort, and the only signal for the worst case: Azure can silently
+    # DROP text in a script it can't read when the page also has a readable
+    # language, leaving NO trace in the result (a Georgian+English contract
+    # comes back as clean, confident English with the Georgian column simply
+    # gone). Catch it by scanning the image for text-like ink Azure never
+    # covered with a word box. Only worth the pixels when the LLM can rescue.
+    if (not needs_rescue and OCR_FALLBACK == "llm" and _azure_openai_configured()
+            and _ink_scan_eligible(file_type, ocr_pages)
+            and _unread_ink_fraction(file_path, file_type, result) >= UNREAD_INK_MIN_FRACTION):
+        needs_rescue = True
+
+    if needs_rescue:
         if OCR_FALLBACK == "llm" and _azure_openai_configured():
             raw, raw_segments = run_llm_ocr(file_path, file_type, pinned_lang)
             text = normalize_ocr_text(raw or "")

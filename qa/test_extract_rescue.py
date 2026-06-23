@@ -114,6 +114,7 @@ def run():
     with patch.object(app.doc_client, "begin_analyze_document",
                        return_value=_Poller(good_result)), \
          patch.object(app, "run_llm_ocr", side_effect=AssertionError("should not be called")), \
+         patch.object(app, "_unread_ink_fraction", return_value=0.0), \
          patch.object(app, "OCR_FALLBACK", "llm"), \
          patch.object(app, "_azure_openai_configured", return_value=True):
         result2 = app.extract_text(fake_path, "image")
@@ -134,6 +135,7 @@ def run():
     with patch.object(app.doc_client, "begin_analyze_document",
                        return_value=_Poller(trilingual_result)), \
          patch.object(app, "run_llm_ocr", side_effect=AssertionError("should not be called")), \
+         patch.object(app, "_unread_ink_fraction", return_value=0.0), \
          patch.object(app, "OCR_FALLBACK", "llm"), \
          patch.object(app, "_azure_openai_configured", return_value=True):
         result3 = app.extract_text(fake_path, "image")
@@ -161,6 +163,38 @@ def run():
 
     check("untagged Georgian column triggers the LLM rescue",
           result4.used_fallback is True and result4.text.startswith(rescued_text))
+
+    # The real-world worst case (verified on en-ge1.png): Azure drops the
+    # Georgian column ENTIRELY — not even garbage, no Georgian unicode in the
+    # text at all — and returns clean, confident English. Nothing in the result
+    # can reveal it; only the image pixels can. Here the text is pure Latin
+    # English (no hidden script to catch) and the only signal is a high
+    # unread-ink fraction.
+    clean_en = _Result("E" * 60, [_Lang("en-US", 0.98, [(0, 60)])])
+    with patch.object(app.doc_client, "begin_analyze_document",
+                       return_value=_Poller(clean_en)), \
+         patch.object(app, "_unread_ink_fraction", return_value=0.52), \
+         patch.object(app, "run_llm_ocr",
+                       return_value=(rescued_text, [("ka", rescued_text), ("en", "english half")])), \
+         patch.object(app, "OCR_FALLBACK", "llm"), \
+         patch.object(app, "_azure_openai_configured", return_value=True):
+        result5 = app.extract_text(fake_path, "image")
+
+    check("dropped column (high unread ink) triggers the LLM rescue",
+          result5.used_fallback is True and result5.text.startswith(rescued_text))
+
+    # And the same clean English page with LOW unread ink (genuinely monolingual)
+    # must NOT pay for an LLM call.
+    with patch.object(app.doc_client, "begin_analyze_document",
+                       return_value=_Poller(clean_en)), \
+         patch.object(app, "_unread_ink_fraction", return_value=0.02), \
+         patch.object(app, "run_llm_ocr", side_effect=AssertionError("should not be called")), \
+         patch.object(app, "OCR_FALLBACK", "llm"), \
+         patch.object(app, "_azure_openai_configured", return_value=True):
+        result6 = app.extract_text(fake_path, "image")
+
+    check("clean English page with low unread ink is not rescued",
+          result6.locale2 == "en" and result6.used_fallback is False)
 
     os.remove(fake_path)
     print()
