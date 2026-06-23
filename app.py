@@ -121,7 +121,7 @@ MESSAGES = {
         "bot_short_description": "Photo/PDF → voice message. Automatic language detection. Helps people with low vision.",
         "feedback_prompt": "📝 Please type your feedback in the next message — I'll pass it on. (You can also use /feedback your text.)",
         "feedback_thanks": "🙏 Thank you for your feedback!",
-        "support_menu": "💙 Support Yonchee\n\nChoose a coffee cup pack to get bonus requests:",
+        "support_menu": "💙 Support the project (donate)\n\nChoose a coffee cup pack to get bonus requests:",
         "support_pack_1": "☕ One cup · +50",
         "support_pack_2": "☕☕ Two cups · +150",
         "support_pack_3": "☕☕☕ Three cups · +300",
@@ -140,7 +140,7 @@ MESSAGES = {
         "mission_short_audio": "Yonchee helps people who find reading difficult by turning photos and PDFs into voice messages inside Telegram.",
         "onboarding_start_button": "🚀 Start",
         "onboarding_listen_button": "🔊 Listen to mission",
-        "onboarding_support_button": "💙 How to support",
+        "onboarding_support_button": "💙 Support the project (donate)",
         "onboarding_started": "Great. Send a photo or PDF, and I'll turn the text into a voice message.",
         "mission_audio_error": "I couldn't generate mission audio right now. Please try again in a bit.",
     },
@@ -172,7 +172,7 @@ MESSAGES = {
         "bot_short_description": "Фото/PDF → голосовое сообщение. Автоопределение языка. Помогает людям со слабым зрением.",
         "feedback_prompt": "📝 Напишите ваш отзыв следующим сообщением — я его передам. (Можно и так: /feedback ваш текст.)",
         "feedback_thanks": "🙏 Спасибо за отзыв!",
-        "support_menu": "💙 Поддержать Yonchee\n\nВыберите пакет «чашка кофе», чтобы получить бонусные запросы:",
+        "support_menu": "💙 Поддержать проект (донат)\n\nВыберите пакет «чашка кофе», чтобы получить бонусные запросы:",
         "support_pack_1": "☕ Одна чашка · +50",
         "support_pack_2": "☕☕ Две чашки · +150",
         "support_pack_3": "☕☕☕ Три чашки · +300",
@@ -191,7 +191,7 @@ MESSAGES = {
         "mission_short_audio": "Yonchee помогает людям, которым сложно читать, превращая фото и PDF в голосовые сообщения внутри Telegram.",
         "onboarding_start_button": "🚀 Начать",
         "onboarding_listen_button": "🔊 Прослушать миссию",
-        "onboarding_support_button": "💙 Как поддержать",
+        "onboarding_support_button": "💙 Поддержать проект (донат)",
         "onboarding_started": "Отлично. Отправьте фото или PDF, и я превращу текст в голосовое сообщение.",
         "mission_audio_error": "Сейчас не удалось сгенерировать аудио миссии. Попробуйте чуть позже.",
     },
@@ -223,7 +223,7 @@ MESSAGES = {
         "bot_short_description": "Фото/PDF → голосове повідомлення. Автовизначення мови. Допомагає людям зі слабким зором.",
         "feedback_prompt": "📝 Напишіть ваш відгук наступним повідомленням — я його передам. (Можна й так: /feedback ваш текст.)",
         "feedback_thanks": "🙏 Дякуємо за відгук!",
-        "support_menu": "💙 Підтримати Yonchee\n\nОберіть пакет «чашка кави», щоб отримати бонусні запити:",
+        "support_menu": "💙 Підтримати проєкт (донат)\n\nОберіть пакет «чашка кави», щоб отримати бонусні запити:",
         "support_pack_1": "☕ Одна чашка · +50",
         "support_pack_2": "☕☕ Дві чашки · +150",
         "support_pack_3": "☕☕☕ Три чашки · +300",
@@ -265,7 +265,7 @@ MESSAGES = {
         "bot_short_description": "Foto/PDF → mensaje de voz. Detección automática de idioma. Ayuda a personas con baja visión.",
         "feedback_prompt": "📝 Escribe tu comentario en el siguiente mensaje — lo transmitiré. (También puedes usar /feedback tu texto.)",
         "feedback_thanks": "🙏 ¡Gracias por tu comentario!",
-        "support_menu": "💙 Apoyar Yonchee\n\nElige un paquete tipo taza de cafe para obtener solicitudes extra:",
+        "support_menu": "💙 Apoyar el proyecto (donar)\n\nElige un paquete tipo taza de cafe para obtener solicitudes extra:",
         "support_pack_1": "☕ Una taza · +50",
         "support_pack_2": "☕☕ Dos tazas · +150",
         "support_pack_3": "☕☕☕ Tres tazas · +300",
@@ -307,7 +307,7 @@ MESSAGES = {
         "bot_short_description": "Foto/PDF → Sprachnachricht. Automatische Spracherkennung. Für Menschen mit Sehbehinderung.",
         "feedback_prompt": "📝 Schreib dein Feedback in die nächste Nachricht — ich leite es weiter. (Oder nutze /feedback dein Text.)",
         "feedback_thanks": "🙏 Danke für dein Feedback!",
-        "support_menu": "💙 Yonchee unterstuetzen\n\nWaehle ein Kaffeetassen-Paket fuer Bonus-Anfragen:",
+        "support_menu": "💙 Das Projekt unterstuetzen (Spende)\n\nWaehle ein Kaffeetassen-Paket fuer Bonus-Anfragen:",
         "support_pack_1": "☕ Eine Tasse · +50",
         "support_pack_2": "☕☕ Zwei Tassen · +150",
         "support_pack_3": "☕☕☕ Drei Tassen · +300",
@@ -349,7 +349,7 @@ MESSAGES = {
         "bot_short_description": "Photo/PDF → message vocal. Détection automatique de la langue. Aide les personnes malvoyantes.",
         "feedback_prompt": "📝 Écris ton retour dans le prochain message — je le transmettrai. (Tu peux aussi utiliser /feedback ton texte.)",
         "feedback_thanks": "🙏 Merci pour ton retour !",
-        "support_menu": "💙 Soutenir Yonchee\n\nChoisis un pack tasse de cafe pour obtenir des requetes bonus :",
+        "support_menu": "💙 Soutenir le projet (don)\n\nChoisis un pack tasse de cafe pour obtenir des requetes bonus :",
         "support_pack_1": "☕ Une tasse · +50",
         "support_pack_2": "☕☕ Deux tasses · +150",
         "support_pack_3": "☕☕☕ Trois tasses · +300",
@@ -391,7 +391,7 @@ MESSAGES = {
         "bot_short_description": "Zdjęcie/PDF → wiadomość głosowa. Automatyczne wykrywanie języka. Pomaga osobom słabowidzącym.",
         "feedback_prompt": "📝 Napisz swoją opinię w następnej wiadomości — przekażę ją. (Możesz też użyć /feedback twój tekst.)",
         "feedback_thanks": "🙏 Dziękujemy za opinię!",
-        "support_menu": "💙 Wesprzyj Yonchee\n\nWybierz pakiet kawa, aby otrzymac bonusowe zapytania:",
+        "support_menu": "💙 Wesprzyj projekt (darowizna)\n\nWybierz pakiet kawa, aby otrzymac bonusowe zapytania:",
         "support_pack_1": "☕ Jedna kawa · +50",
         "support_pack_2": "☕☕ Dwie kawy · +150",
         "support_pack_3": "☕☕☕ Trzy kawy · +300",
@@ -433,7 +433,7 @@ MESSAGES = {
         "bot_short_description": "Foto/PDF → mensagem de voz. Detecção automática de idioma. Ajuda pessoas com baixa visão.",
         "feedback_prompt": "📝 Escreva seu comentário na próxima mensagem — vou repassá-lo. (Você também pode usar /feedback seu texto.)",
         "feedback_thanks": "🙏 Obrigado pelo seu comentário!",
-        "support_menu": "💙 Apoiar Yonchee\n\nEscolha um pacote tipo xicara de cafe para receber pedidos bonus:",
+        "support_menu": "💙 Apoiar o projeto (doar)\n\nEscolha um pacote tipo xicara de cafe para receber pedidos bonus:",
         "support_pack_1": "☕ Uma xicara · +50",
         "support_pack_2": "☕☕ Duas xicaras · +150",
         "support_pack_3": "☕☕☕ Tres xicaras · +300",
@@ -2158,7 +2158,7 @@ async def _post_init(application) -> None:
         BotCommand("start", "Start / how it works"),
         BotCommand("help", "How to use the bot"),
         BotCommand("limits", "Show today's free and bonus limits"),
-        BotCommand("support", "Support and get bonus requests"),
+        BotCommand("donate", "Donate to get bonus requests"),
         BotCommand("language", "Set audio language (or auto-detect)"),
         BotCommand("feedback", "Send feedback / report an issue"),
     ]
@@ -2198,7 +2198,7 @@ def main() -> None:
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("limits", limits_command))
-    app.add_handler(CommandHandler("support", support_command))
+    app.add_handler(CommandHandler("donate", support_command))
     app.add_handler(CommandHandler("language", language_command))
     app.add_handler(CommandHandler("feedback", feedback_command))
     app.add_handler(CommandHandler("unlimited", unlimited_command))
