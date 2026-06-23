@@ -9,7 +9,7 @@ import platform
 import time
 import html
 from datetime import datetime, timedelta
-from collections import defaultdict
+from collections import defaultdict, deque
 from typing import NamedTuple, Optional
 from dotenv import load_dotenv
 
@@ -18,10 +18,10 @@ try:
 except ImportError:
     AzureLogHandler = None
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler,
-    ContextTypes, filters
+    ContextTypes, filters, TypeHandler, ApplicationHandlerStop
 )
 from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.ai.documentintelligence.models import DocumentAnalysisFeature
@@ -117,11 +117,12 @@ MESSAGES = {
         "default_set": "✅ Default language set: {lang}.",
         "default_auto": "✅ Auto-detect enabled — I'll detect each document's language.",
         "lang_hint": "🌐 By default I detect the document's language automatically. If I get it wrong, or to always use a specific language, tap /language.",
+        "start_free_quota": "🆓 You get {free_total} free requests every day. Check your balance anytime with /limits.",
         "bot_description": "Send a photo or PDF and I'll read the text aloud as a voice message. I detect the language automatically — or set one with /language. Made to help people with low vision.",
         "bot_short_description": "Photo/PDF → voice message. Automatic language detection. Helps people with low vision.",
         "feedback_prompt": "📝 Please type your feedback in the next message — I'll pass it on. (You can also use /feedback your text.)",
         "feedback_thanks": "🙏 Thank you for your feedback!",
-        "support_menu": "💙 Support Yonchee\n\nChoose a coffee cup pack to get bonus requests:",
+        "support_menu": "💙 Support the project (donate)\n\nChoose a coffee cup pack to get bonus requests:",
         "support_pack_1": "☕ One cup · +50",
         "support_pack_2": "☕☕ Two cups · +150",
         "support_pack_3": "☕☕☕ Three cups · +300",
@@ -140,7 +141,7 @@ MESSAGES = {
         "mission_short_audio": "Yonchee helps people who find reading difficult by turning photos and PDFs into voice messages inside Telegram.",
         "onboarding_start_button": "🚀 Start",
         "onboarding_listen_button": "🔊 Listen to mission",
-        "onboarding_support_button": "💙 How to support",
+        "onboarding_support_button": "💙 Support the project (donate)",
         "onboarding_started": "Great. Send a photo or PDF, and I'll turn the text into a voice message.",
         "mission_audio_error": "I couldn't generate mission audio right now. Please try again in a bit.",
     },
@@ -168,11 +169,12 @@ MESSAGES = {
         "default_set": "✅ Язык по умолчанию установлен: {lang}.",
         "default_auto": "✅ Включено авто-определение — буду определять язык каждого документа.",
         "lang_hint": "🌐 По умолчанию я определяю язык документа автоматически. Если язык определён неверно — или чтобы всегда использовать конкретный — нажмите /language.",
+        "start_free_quota": "🆓 Каждый день у тебя есть {free_total} бесплатных запросов. Баланс всегда можно посмотреть через /limits.",
         "bot_description": "Пришлите фото или PDF, и я прочитаю текст вслух голосовым сообщением. Язык определяю автоматически — или задайте его через /language. Создан, чтобы помогать людям со слабым зрением.",
         "bot_short_description": "Фото/PDF → голосовое сообщение. Автоопределение языка. Помогает людям со слабым зрением.",
         "feedback_prompt": "📝 Напишите ваш отзыв следующим сообщением — я его передам. (Можно и так: /feedback ваш текст.)",
         "feedback_thanks": "🙏 Спасибо за отзыв!",
-        "support_menu": "💙 Поддержать Yonchee\n\nВыберите пакет «чашка кофе», чтобы получить бонусные запросы:",
+        "support_menu": "💙 Поддержать проект (донат)\n\nВыберите пакет «чашка кофе», чтобы получить бонусные запросы:",
         "support_pack_1": "☕ Одна чашка · +50",
         "support_pack_2": "☕☕ Две чашки · +150",
         "support_pack_3": "☕☕☕ Три чашки · +300",
@@ -191,7 +193,7 @@ MESSAGES = {
         "mission_short_audio": "Yonchee помогает людям, которым сложно читать, превращая фото и PDF в голосовые сообщения внутри Telegram.",
         "onboarding_start_button": "🚀 Начать",
         "onboarding_listen_button": "🔊 Прослушать миссию",
-        "onboarding_support_button": "💙 Как поддержать",
+        "onboarding_support_button": "💙 Поддержать проект (донат)",
         "onboarding_started": "Отлично. Отправьте фото или PDF, и я превращу текст в голосовое сообщение.",
         "mission_audio_error": "Сейчас не удалось сгенерировать аудио миссии. Попробуйте чуть позже.",
     },
@@ -219,11 +221,12 @@ MESSAGES = {
         "default_set": "✅ Мову за замовчуванням встановлено: {lang}.",
         "default_auto": "✅ Увімкнено авто-визначення — визначатиму мову кожного документа.",
         "lang_hint": "🌐 За замовчуванням я визначаю мову документа автоматично. Якщо мову визначено неправильно — або щоб завжди використовувати певну — натисніть /language.",
+        "start_free_quota": "🆓 Щодня в тебе є {free_total} безкоштовних запитів. Баланс завжди можна переглянути через /limits.",
         "bot_description": "Надішліть фото або PDF, і я прочитаю текст уголос голосовим повідомленням. Мову визначаю автоматично — або задайте її через /language. Створений, щоб допомагати людям зі слабким зором.",
         "bot_short_description": "Фото/PDF → голосове повідомлення. Автовизначення мови. Допомагає людям зі слабким зором.",
         "feedback_prompt": "📝 Напишіть ваш відгук наступним повідомленням — я його передам. (Можна й так: /feedback ваш текст.)",
         "feedback_thanks": "🙏 Дякуємо за відгук!",
-        "support_menu": "💙 Підтримати Yonchee\n\nОберіть пакет «чашка кави», щоб отримати бонусні запити:",
+        "support_menu": "💙 Підтримати проєкт (донат)\n\nОберіть пакет «чашка кави», щоб отримати бонусні запити:",
         "support_pack_1": "☕ Одна чашка · +50",
         "support_pack_2": "☕☕ Дві чашки · +150",
         "support_pack_3": "☕☕☕ Три чашки · +300",
@@ -261,11 +264,12 @@ MESSAGES = {
         "default_set": "✅ Idioma predeterminado establecido: {lang}.",
         "default_auto": "✅ Detección automática activada: detectaré el idioma de cada documento.",
         "lang_hint": "🌐 Por defecto detecto el idioma del documento automáticamente. Si me equivoco, o para usar siempre un idioma concreto, toca /language.",
+        "start_free_quota": "🆓 Tienes {free_total} solicitudes gratis cada día. Consulta tu saldo cuando quieras con /limits.",
         "bot_description": "Envía una foto o PDF y leeré el texto en voz alta como mensaje de voz. Detecto el idioma automáticamente — o configúralo con /language. Creado para ayudar a personas con baja visión.",
         "bot_short_description": "Foto/PDF → mensaje de voz. Detección automática de idioma. Ayuda a personas con baja visión.",
         "feedback_prompt": "📝 Escribe tu comentario en el siguiente mensaje — lo transmitiré. (También puedes usar /feedback tu texto.)",
         "feedback_thanks": "🙏 ¡Gracias por tu comentario!",
-        "support_menu": "💙 Apoyar Yonchee\n\nElige un paquete tipo taza de cafe para obtener solicitudes extra:",
+        "support_menu": "💙 Apoyar el proyecto (donar)\n\nElige un paquete tipo taza de cafe para obtener solicitudes extra:",
         "support_pack_1": "☕ Una taza · +50",
         "support_pack_2": "☕☕ Dos tazas · +150",
         "support_pack_3": "☕☕☕ Tres tazas · +300",
@@ -303,11 +307,12 @@ MESSAGES = {
         "default_set": "✅ Standardsprache festgelegt: {lang}.",
         "default_auto": "✅ Automatische Erkennung aktiviert – ich erkenne die Sprache jedes Dokuments.",
         "lang_hint": "🌐 Standardmäßig erkenne ich die Sprache des Dokuments automatisch. Wenn ich falsch liege, oder für eine feste Sprache, tippe auf /language.",
+        "start_free_quota": "🆓 Du hast jeden Tag {free_total} kostenlose Anfragen. Deinen Stand siehst du jederzeit mit /limits.",
         "bot_description": "Sende ein Foto oder PDF und ich lese den Text als Sprachnachricht vor. Die Sprache erkenne ich automatisch — oder lege sie mit /language fest. Für Menschen mit Sehbehinderung.",
         "bot_short_description": "Foto/PDF → Sprachnachricht. Automatische Spracherkennung. Für Menschen mit Sehbehinderung.",
         "feedback_prompt": "📝 Schreib dein Feedback in die nächste Nachricht — ich leite es weiter. (Oder nutze /feedback dein Text.)",
         "feedback_thanks": "🙏 Danke für dein Feedback!",
-        "support_menu": "💙 Yonchee unterstuetzen\n\nWaehle ein Kaffeetassen-Paket fuer Bonus-Anfragen:",
+        "support_menu": "💙 Das Projekt unterstuetzen (Spende)\n\nWaehle ein Kaffeetassen-Paket fuer Bonus-Anfragen:",
         "support_pack_1": "☕ Eine Tasse · +50",
         "support_pack_2": "☕☕ Zwei Tassen · +150",
         "support_pack_3": "☕☕☕ Drei Tassen · +300",
@@ -345,11 +350,12 @@ MESSAGES = {
         "default_set": "✅ Langue par défaut définie : {lang}.",
         "default_auto": "✅ Détection automatique activée — je détecterai la langue de chaque document.",
         "lang_hint": "🌐 Par défaut, je détecte automatiquement la langue du document. Si je me trompe, ou pour toujours utiliser une langue précise, tape sur /language.",
+        "start_free_quota": "🆓 Tu as {free_total} requêtes gratuites chaque jour. Vérifie ton solde à tout moment avec /limits.",
         "bot_description": "Envoie une photo ou un PDF et je lis le texte à voix haute en message vocal. Je détecte la langue automatiquement — ou définis-la avec /language. Conçu pour aider les personnes malvoyantes.",
         "bot_short_description": "Photo/PDF → message vocal. Détection automatique de la langue. Aide les personnes malvoyantes.",
         "feedback_prompt": "📝 Écris ton retour dans le prochain message — je le transmettrai. (Tu peux aussi utiliser /feedback ton texte.)",
         "feedback_thanks": "🙏 Merci pour ton retour !",
-        "support_menu": "💙 Soutenir Yonchee\n\nChoisis un pack tasse de cafe pour obtenir des requetes bonus :",
+        "support_menu": "💙 Soutenir le projet (don)\n\nChoisis un pack tasse de cafe pour obtenir des requetes bonus :",
         "support_pack_1": "☕ Une tasse · +50",
         "support_pack_2": "☕☕ Deux tasses · +150",
         "support_pack_3": "☕☕☕ Trois tasses · +300",
@@ -387,11 +393,12 @@ MESSAGES = {
         "default_set": "✅ Ustawiono domyślny język: {lang}.",
         "default_auto": "✅ Włączono automatyczne wykrywanie — wykryję język każdego dokumentu.",
         "lang_hint": "🌐 Domyślnie wykrywam język dokumentu automatycznie. Jeśli się pomylę, lub aby zawsze używać konkretnego języka, naciśnij /language.",
+        "start_free_quota": "🆓 Każdego dnia masz {free_total} darmowych zapytań. Stan sprawdzisz w każdej chwili przez /limits.",
         "bot_description": "Wyślij zdjęcie lub PDF, a przeczytam tekst na głos jako wiadomość głosową. Język wykrywam automatycznie — lub ustaw go przez /language. Stworzony, by pomagać osobom słabowidzącym.",
         "bot_short_description": "Zdjęcie/PDF → wiadomość głosowa. Automatyczne wykrywanie języka. Pomaga osobom słabowidzącym.",
         "feedback_prompt": "📝 Napisz swoją opinię w następnej wiadomości — przekażę ją. (Możesz też użyć /feedback twój tekst.)",
         "feedback_thanks": "🙏 Dziękujemy za opinię!",
-        "support_menu": "💙 Wesprzyj Yonchee\n\nWybierz pakiet kawa, aby otrzymac bonusowe zapytania:",
+        "support_menu": "💙 Wesprzyj projekt (darowizna)\n\nWybierz pakiet kawa, aby otrzymac bonusowe zapytania:",
         "support_pack_1": "☕ Jedna kawa · +50",
         "support_pack_2": "☕☕ Dwie kawy · +150",
         "support_pack_3": "☕☕☕ Trzy kawy · +300",
@@ -429,11 +436,12 @@ MESSAGES = {
         "default_set": "✅ Idioma padrão definido: {lang}.",
         "default_auto": "✅ Detecção automática ativada — vou detectar o idioma de cada documento.",
         "lang_hint": "🌐 Por padrão, detecto o idioma do documento automaticamente. Se eu errar, ou para usar sempre um idioma específico, toque em /language.",
+        "start_free_quota": "🆓 Você tem {free_total} pedidos grátis por dia. Veja seu saldo quando quiser com /limits.",
         "bot_description": "Envie uma foto ou PDF e eu leio o texto em voz alta como mensagem de voz. Detecto o idioma automaticamente — ou defina com /language. Feito para ajudar pessoas com baixa visão.",
         "bot_short_description": "Foto/PDF → mensagem de voz. Detecção automática de idioma. Ajuda pessoas com baixa visão.",
         "feedback_prompt": "📝 Escreva seu comentário na próxima mensagem — vou repassá-lo. (Você também pode usar /feedback seu texto.)",
         "feedback_thanks": "🙏 Obrigado pelo seu comentário!",
-        "support_menu": "💙 Apoiar Yonchee\n\nEscolha um pacote tipo xicara de cafe para receber pedidos bonus:",
+        "support_menu": "💙 Apoiar o projeto (doar)\n\nEscolha um pacote tipo xicara de cafe para receber pedidos bonus:",
         "support_pack_1": "☕ Uma xicara · +50",
         "support_pack_2": "☕☕ Duas xicaras · +150",
         "support_pack_3": "☕☕☕ Tres xicaras · +300",
@@ -483,13 +491,54 @@ WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
 BOT_ENV = os.environ.get("BOT_ENV", "local")
 AZURE_STORAGE_CONNECTION_STRING = os.environ.get("AZURE_STORAGE_CONNECTION_STRING", "")
 ADMIN_USER_IDS = {x.strip() for x in os.environ.get("ADMIN_USER_IDS", "").split(",") if x.strip()}
+# User IDs that bypass all daily/bonus limits (e.g. owner, testers). Admins are unlimited too.
+UNLIMITED_USER_IDS = {x.strip() for x in os.environ.get("UNLIMITED_USER_IDS", "").split(",") if x.strip()}
 OCR_FALLBACK = os.environ.get("OCR_FALLBACK", "tesseract").strip().lower()  # tesseract | llm
 SUPPORT_PAYMENT_MODE = os.environ.get("SUPPORT_PAYMENT_MODE", "admin_stub").strip().lower()  # instant | admin_stub
 
 
 def _is_admin(update) -> bool:
-    """True only for user IDs listed in the ADMIN_USER_IDS env var."""
-    return bool(ADMIN_USER_IDS) and str(update.effective_user.id) in ADMIN_USER_IDS
+    """True only for ADMIN_USER_IDS, and only in a private (DM) chat.
+
+    Fail-closed: returns False when ADMIN_USER_IDS is unset, when there's no
+    effective user (e.g. channel posts), or when the action happens anywhere
+    other than the admin's own private chat — so admin replies (which may list
+    granted user IDs) can never surface in a group the bot was added to.
+    """
+    user = update.effective_user
+    chat = update.effective_chat
+    if not ADMIN_USER_IDS or user is None or chat is None:
+        return False
+    if chat.type != "private":
+        return False
+    return str(user.id) in ADMIN_USER_IDS
+
+
+def _is_unlimited(user_id) -> bool:
+    """True for IDs in UNLIMITED_USER_IDS (and any admin) — bypasses all quota limits."""
+    uid = str(user_id)
+    return uid in UNLIMITED_USER_IDS or uid in ADMIN_USER_IDS
+
+
+# Bounded de-dupe of Telegram update_ids. With webhook + scale-to-zero, a cold start
+# (~10-15 s) makes Telegram time out and re-deliver the same update several times; once
+# the container is warm all the retries arrive and would each be processed. We drop any
+# update_id we've already handled in this process.
+_seen_update_ids = deque(maxlen=2048)
+_seen_update_set = set()
+
+
+async def _dedupe_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    upd_id = getattr(update, "update_id", None)
+    if upd_id is None:
+        return
+    if upd_id in _seen_update_set:
+        logger.info(f"Dropping duplicate update_id={upd_id}")
+        raise ApplicationHandlerStop
+    if len(_seen_update_ids) == _seen_update_ids.maxlen:
+        _seen_update_set.discard(_seen_update_ids[0])  # evicted by the append below
+    _seen_update_ids.append(upd_id)
+    _seen_update_set.add(upd_id)
 
 
 def log_usage(user_id: int, status: str, reason: str = None, language: str = None,
@@ -567,7 +616,7 @@ USER_TABLE_NAME = "users"
 FEEDBACK_TABLE_NAME = "feedback"
 STORE_PARTITION = BOT_ENV or "user"  # isolate dev/prod data within one shared table
 MAX_RECENT_LANGS = 3
-FREE_DAILY_LIMIT = max(1, int(os.environ.get("FREE_DAILY_LIMIT", "5")))
+FREE_DAILY_LIMIT = max(1, int(os.environ.get("FREE_DAILY_LIMIT", "10")))
 # How long a pending /feedback prompt stays "armed" (survives scale-to-zero / replica
 # switch via storage). Beyond this, a stray text message won't be captured as feedback.
 FEEDBACK_WAIT_WINDOW_SEC = 3600
@@ -587,6 +636,16 @@ class _MemoryStore:
         u["daily_used"] = str(max(0, int(daily_used or 0)))
         u["bonus_credits"] = str(max(0, int(bonus_credits or 0)))
         u["bonus_until"] = bonus_until or ""
+
+    def set_unlimited(self, user_id, on):
+        u = self._d.setdefault(user_id, {})
+        if on:
+            u["unlimited"] = "1"
+        else:
+            u.pop("unlimited", None)
+
+    def list_unlimited_users(self):
+        return [str(uid) for uid, u in self._d.items() if str(u.get("unlimited") or "") == "1"]
 
     def set_default_lang(self, user_id, locale2):
         u = self._d.setdefault(user_id, {})
@@ -635,7 +694,8 @@ class _TableStore:
                     "quota_day": e.get("quota_day") or "",
                     "daily_used": e.get("daily_used") or "0",
                     "bonus_credits": e.get("bonus_credits") or "0",
-                    "bonus_until": e.get("bonus_until") or ""}
+                    "bonus_until": e.get("bonus_until") or "",
+                    "unlimited": e.get("unlimited") or ""}
         except ResourceNotFoundError:
             return {}
         except Exception as ex:
@@ -671,6 +731,18 @@ class _TableStore:
     def set_awaiting_feedback(self, user_id, on):
         # Persisted so a /feedback prompt survives scale-to-zero and replica switches.
         self._upsert(user_id, awaiting_fb=int(time.time()) if on else 0)
+
+    def set_unlimited(self, user_id, on):
+        self._upsert(user_id, unlimited="1" if on else "")
+
+    def list_unlimited_users(self):
+        try:
+            items = self._client.query_entities(
+                f"PartitionKey eq '{STORE_PARTITION}' and unlimited eq '1'")
+            return [e.get("RowKey") for e in items]
+        except Exception as ex:
+            logger.warning(f"list_unlimited_users failed: {ex!r}")
+            return []
 
     def add_feedback(self, user_id, username, ui_lang, text):
         ts = int(time.time() * 1000)
@@ -1025,6 +1097,18 @@ def _load_quota(user_id: int):
         except Exception as ex:
             logger.warning(f"set_quota_state failed: {ex!r}")
 
+    unlimited = _is_unlimited(user_id) or str(raw.get("unlimited") or "") == "1"
+    if unlimited:
+        return {
+            "quota_day": quota_day,
+            "daily_used": daily_used,
+            "free_left": "∞",
+            "free_total": "∞",
+            "bonus_credits": "∞",
+            "bonus_until": bonus_until or "-",
+            "unlimited": True,
+        }
+
     free_left = max(0, FREE_DAILY_LIMIT - daily_used)
     return {
         "quota_day": quota_day,
@@ -1033,14 +1117,15 @@ def _load_quota(user_id: int):
         "free_total": FREE_DAILY_LIMIT,
         "bonus_credits": bonus_credits,
         "bonus_until": bonus_until,
+        "unlimited": False,
     }
 
 
 def _consume_quota(user_id: int, cost: int = 1):
     """Spend daily free quota first, then bonus credits. Returns (ok, snapshot)."""
-    if cost <= 0:
-        return True, _load_quota(user_id)
     snap = _load_quota(user_id)
+    if cost <= 0 or snap.get("unlimited"):
+        return True, snap
     free_left = snap["free_left"]
     bonus = snap["bonus_credits"]
 
@@ -1133,7 +1218,9 @@ async def _keep_typing(bot, chat_id: int, stop: asyncio.Event) -> None:
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
     logger.info(f"User {user_id} requested help")
-    await update.message.reply_text(t(update, "help"))
+    # ReplyKeyboardRemove clears the legacy 1/2/3 language reply-keyboard left over
+    # from an older version (current UI uses inline buttons). No-op for new users.
+    await update.message.reply_text(t(update, "help"), reply_markup=ReplyKeyboardRemove())
 
 
 async def limits_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1171,7 +1258,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.info(f"UserStartedBot: user_id={user_id}, lang={lang_code}, source={start_source or '-'}")
     log_growth_event(user_id, event_type="onboarding_start", source=start_source or None)
     await update.message.reply_text(
-        f"{t(update, 'welcome')}\n\n{t(update, 'mission_intro')}\n\n{t(update, 'lang_hint')}",
+        f"{t(update, 'welcome')}\n\n{t(update, 'mission_intro')}\n\n"
+        f"{t(update, 'start_free_quota', free_total=FREE_DAILY_LIMIT)}\n\n{t(update, 'lang_hint')}",
         reply_markup=build_onboarding_keyboard(update),
     )
 
@@ -1277,7 +1365,10 @@ async def _process_file_payload(
     """Download → OCR/detect → synthesize flow for an accepted file payload."""
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
-    status_message = await context.bot.send_message(chat_id, t(update, "analyzing"))
+    # reply_markup also clears the legacy 1/2/3 language reply-keyboard from older
+    # versions so it disappears on the user's next file (no-op if they never had it).
+    status_message = await context.bot.send_message(
+        chat_id, t(update, "analyzing"), reply_markup=ReplyKeyboardRemove())
     stop_typing = asyncio.Event()
     typing_task = asyncio.create_task(_keep_typing(context.bot, chat_id, stop_typing))
     file_path = None
@@ -1855,6 +1946,80 @@ async def on_support_admin_callback(update: Update, context: ContextTypes.DEFAUL
         await query.edit_message_text(f"Rejected: user {target_user_id}, pack {pack_key}.")
 
 
+def _build_unlimited_list(ui_chrome: bool = True):
+    """Return (text, keyboard) listing store-granted unlimited users with revoke buttons.
+
+    Note: IDs granted via the ADMIN_USER_IDS / UNLIMITED_USER_IDS env vars are also
+    unlimited but are not listed here — they're managed by deployment config, not buttons.
+    """
+    try:
+        ids = list(user_store.list_unlimited_users())
+    except Exception as ex:
+        logger.warning(f"list_unlimited_users failed: {ex!r}")
+        ids = []
+    rows = [[InlineKeyboardButton(f"🚫 Revoke {uid}", callback_data=f"unlim:revoke:{uid}")]
+            for uid in ids]
+    if ids:
+        text = "♾ Unlimited users (tap to revoke):\n" + "\n".join(f"• {u}" for u in ids)
+    else:
+        text = "♾ No unlimited users granted yet."
+    if ui_chrome:
+        text += "\n\nGrant access with:  /unlimited <user_id>"
+    return text, (InlineKeyboardMarkup(rows) if rows else None)
+
+
+async def unlimited_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Admin-only: grant/list unlimited (no-limit) access. /unlimited <id> grants;
+    /unlimited alone lists current grants with inline revoke buttons."""
+    if not _is_admin(update):
+        await update.message.reply_text(t(update, "help"))
+        return
+    arg = context.args[0].strip() if context.args else ""
+    if arg:
+        if not arg.isdigit():
+            await update.message.reply_text("Usage: /unlimited <numeric user_id>")
+            return
+        try:
+            user_store.set_unlimited(int(arg), True)
+        except Exception as ex:
+            logger.warning(f"set_unlimited grant failed: {ex!r}")
+            await update.message.reply_text("⚠️ Failed to grant, try again.")
+            return
+        log_growth_event(int(arg), event_type="unlimited_granted", source="admin")
+        await update.message.reply_text(
+            f"✅ Unlimited access granted to {arg}.",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton(f"🚫 Revoke {arg}", callback_data=f"unlim:revoke:{arg}")
+            ]]),
+        )
+        return
+    text, kb = _build_unlimited_list()
+    await update.message.reply_text(text, reply_markup=kb)
+
+
+async def on_unlimited_admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+    if not _is_admin(update):
+        await context.bot.send_message(update.effective_chat.id, t(update, "help"))
+        return
+    parts = (query.data or "").split(":")
+    if len(parts) != 3 or parts[0] != "unlim" or not parts[2].isdigit():
+        return
+    action, uid = parts[1], parts[2]
+    on = (action == "grant")
+    try:
+        user_store.set_unlimited(int(uid), on)
+    except Exception as ex:
+        logger.warning(f"set_unlimited toggle failed: {ex!r}")
+        await query.answer("Failed, try again.", show_alert=True)
+        return
+    log_growth_event(int(uid), event_type=("unlimited_granted" if on else "unlimited_revoked"),
+                     source="admin")
+    text, kb = _build_unlimited_list()
+    await query.edit_message_text(text, reply_markup=kb)
+
+
 async def feedback_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = " ".join(context.args).strip() if context.args else ""
     if text:
@@ -1902,7 +2067,9 @@ async def on_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 logger.warning(f"clear awaiting_fb failed: {ex!r}")
             await _save_feedback(update, context, text)
             return
-    await update.message.reply_text(t(update, "help"))
+    # Also clears the legacy 1/2/3 language reply-keyboard if the user still has it
+    # (tapping those stale buttons sends plain text and lands here).
+    await update.message.reply_text(t(update, "help"), reply_markup=ReplyKeyboardRemove())
 
 
 async def feedback_recent_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2000,7 +2167,7 @@ async def _post_init(application) -> None:
         BotCommand("start", "Start / how it works"),
         BotCommand("help", "How to use the bot"),
         BotCommand("limits", "Show today's free and bonus limits"),
-        BotCommand("support", "Support and get bonus requests"),
+        BotCommand("donate", "Donate to get bonus requests"),
         BotCommand("language", "Set audio language (or auto-detect)"),
         BotCommand("feedback", "Send feedback / report an issue"),
     ]
@@ -2011,6 +2178,7 @@ async def _post_init(application) -> None:
     # Admins also see the owner-only commands in their personal menu (scoped by chat),
     # so they're discoverable without exposing them to regular users.
     admin_cmds = public_cmds + [
+        BotCommand("unlimited", "Admin: grant/list unlimited access"),
         BotCommand("feedback_recent", "Admin: last 10 feedback"),
         BotCommand("feedback_stats", "Admin: feedback stats"),
         BotCommand("feedback_digest", "Admin: AI improvement digest"),
@@ -2034,12 +2202,15 @@ def main() -> None:
         .post_init(_post_init)
         .build()
     )
+    # Runs before everything (group=-1): drop duplicate webhook re-deliveries.
+    app.add_handler(TypeHandler(Update, _dedupe_update), group=-1)
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("limits", limits_command))
-    app.add_handler(CommandHandler("support", support_command))
+    app.add_handler(CommandHandler("donate", support_command))
     app.add_handler(CommandHandler("language", language_command))
     app.add_handler(CommandHandler("feedback", feedback_command))
+    app.add_handler(CommandHandler("unlimited", unlimited_command))
     app.add_handler(CommandHandler("feedback_recent", feedback_recent_command))
     app.add_handler(CommandHandler("feedback_stats", feedback_stats_command))
     app.add_handler(CommandHandler("feedback_digest", feedback_digest_command))
@@ -2049,6 +2220,7 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(on_precost_callback, pattern=r"^pre:"))
     app.add_handler(CallbackQueryHandler(on_support_callback, pattern=r"^sup:"))
     app.add_handler(CallbackQueryHandler(on_support_admin_callback, pattern=r"^supadm:"))
+    app.add_handler(CallbackQueryHandler(on_unlimited_admin_callback, pattern=r"^unlim:"))
     app.add_handler(CallbackQueryHandler(on_setlang_callback, pattern=r"^setlang:"))
     app.add_handler(CallbackQueryHandler(on_language_callback, pattern=r"^lang:"))
 
