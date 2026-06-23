@@ -148,6 +148,7 @@ def run(cases, dry_run=False, save_text=False, pin_expected=False):
             "ocr_pages": ocr.ocr_pages,
             "used_fallback": ocr.used_fallback,
             "text_len": len(ocr.text),
+            "seg_langs": [s[0] for s in ocr.segments] if ocr.segments else None,
         })
         exp_lang = case.get("expected_lang")
         row["lang_correct"] = (exp_lang == ocr.locale2) if exp_lang else None
@@ -170,8 +171,9 @@ def run(cases, dry_run=False, save_text=False, pin_expected=False):
 
         mark = "✓" if row.get("lang_correct") in (True, None) else "✗"
         cer_s = f" cer={row['cer']:.3f}" if row.get("cer") is not None else ""
+        seg_s = f" segs={'+'.join(row['seg_langs'])}" if row.get("seg_langs") else ""
         print(f"  {mark} {cid}: lang={ocr.locale2} (exp {exp_lang}) "
-              f"conf={ocr.confidence:.2f} cov={ocr.coverage:.2f}{cer_s}")
+              f"conf={ocr.confidence:.2f} cov={ocr.coverage:.2f}{cer_s}{seg_s}")
         results.append(row)
 
     return results

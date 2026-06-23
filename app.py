@@ -190,7 +190,9 @@ MESSAGES = {
         "limits_status": "📊 Лимиты\n\nБесплатно сегодня: {free_left}/{free_total}\nБонусные запросы: {bonus_left}\nБонус действует до: {bonus_until}",
         "limit_reached": "⚠️ На сегодня бесплатный лимит исчерпан и бонусные запросы закончились. Возвращайтесь завтра или поддержите проект для дополнительных запросов.",
         "mission_intro": "☕ Финансирование доступности\n\nYonchee создан, чтобы помогать людям, которым сложно читать. Название связано с Иваном (Yonchee): в юности у него значительно ухудшилось зрение, и это стало отправной точкой идеи продукта.",
-        "mission_short_audio": "Yonchee помогает людям, которым сложно читать, превращая фото и PDF в голосовые сообщения внутри Telegram.",
+        # Audio-only (never displayed): Latin tokens are spelled phonetically so the
+        # Russian neural voice doesn't mangle them (PDF -> "пи-ди-эф", brand -> "Йончи").
+        "mission_short_audio": "Йончи помогает людям, которым сложно читать, превращая фото и пи-ди-эф в голосовые сообщения внутри Телеграма.",
         "onboarding_start_button": "🚀 Начать",
         "onboarding_listen_button": "🔊 Прослушать миссию",
         "onboarding_support_button": "💙 Поддержать проект (донат)",
@@ -493,7 +495,14 @@ AZURE_STORAGE_CONNECTION_STRING = os.environ.get("AZURE_STORAGE_CONNECTION_STRIN
 ADMIN_USER_IDS = {x.strip() for x in os.environ.get("ADMIN_USER_IDS", "").split(",") if x.strip()}
 # User IDs that bypass all daily/bonus limits (e.g. owner, testers). Admins are unlimited too.
 UNLIMITED_USER_IDS = {x.strip() for x in os.environ.get("UNLIMITED_USER_IDS", "").split(",") if x.strip()}
-OCR_FALLBACK = os.environ.get("OCR_FALLBACK", "tesseract").strip().lower()  # tesseract | llm
+OCR_FALLBACK = os.environ.get("OCR_FALLBACK", "llm").strip().lower()  # llm | tesseract
+# Azure OpenAI (vision) for the LLM OCR fallback — reads scripts Azure Read can't
+# (Georgian/Armenian). Falls back to Tesseract when these aren't set.
+AZURE_OPENAI_ENDPOINT = os.environ.get("AZURE_OPENAI_ENDPOINT", "").strip()
+AZURE_OPENAI_API_KEY = os.environ.get("AZURE_OPENAI_API_KEY", "").strip()
+AZURE_OPENAI_DEPLOYMENT = os.environ.get("AZURE_OPENAI_DEPLOYMENT", "gpt-4.1-mini").strip()
+AZURE_OPENAI_API_VERSION = os.environ.get("AZURE_OPENAI_API_VERSION", "2024-10-21").strip()
+LLM_OCR_MAX_PDF_PAGES = int(os.environ.get("LLM_OCR_MAX_PDF_PAGES", "10"))
 SUPPORT_PAYMENT_MODE = os.environ.get("SUPPORT_PAYMENT_MODE", "admin_stub").strip().lower()  # instant | admin_stub
 
 
@@ -929,6 +938,64 @@ def detect_script_language(text):
     return None
 
 
+# A secondary language must cover at least this share of the page before we treat
+# it as genuinely multilingual (and read each part with its own voice). Below this,
+# a stray foreign word or a mis-tagged span is folded into the dominant language.
+MULTI_LANG_MIN_SHARE = 0.15
+
+
+def build_language_segments(result, dominant):
+    """Turn Azure's per-span language detection into ordered (locale2, text)
+    segments so a multilingual page (e.g. Russian prose with French quotes) can be
+    read with the right voice per span instead of one voice for everything.
+
+    Returns None for the common monolingual page — the caller then uses the
+    single-voice path unchanged. Only languages with a TTS voice are honored;
+    untagged gaps inherit the surrounding language so a block isn't split by a
+    separator. Every character of result.content is preserved.
+    """
+    content = getattr(result, "content", None) or ""
+    langs = getattr(result, "languages", None) or []
+    n = len(content)
+    if not n or not dominant:
+        return None
+    owner = [None] * n
+    share = defaultdict(int)
+    for lang in langs:
+        loc = ((getattr(lang, "locale", "") or "")[:2]).lower()
+        if loc not in VOICE_MAP:
+            continue
+        for s in (getattr(lang, "spans", None) or []):
+            off = max(0, s.offset or 0)
+            end = min(n, off + (s.length or 0))
+            for i in range(off, end):
+                if owner[i] is None:
+                    owner[i] = loc
+                    share[loc] += 1
+    # Untagged chars (whitespace/punctuation between runs) inherit the preceding
+    # language; a leading gap takes the dominant one.
+    last = dominant
+    for i in range(n):
+        if owner[i] is None:
+            owner[i] = last
+        else:
+            last = owner[i]
+    if len({*owner}) < 2:
+        return None
+    if not any(loc != dominant and share.get(loc, 0) >= MULTI_LANG_MIN_SHARE * n
+               for loc in set(owner)):
+        return None
+    segments = []
+    start = 0
+    for i in range(1, n + 1):
+        if i == n or owner[i] != owner[start]:
+            seg = content[start:i]
+            if seg.strip():
+                segments.append((owner[start], seg))
+            start = i
+    return segments if len(segments) > 1 else None
+
+
 # --- Fallback OCR for languages Azure Read can't extract (e.g. Georgian) ---
 FALLBACK_LANGS = {"ka", "hy"}        # routed to the fallback OCR engine
 TESSERACT_LANG = {"ka": "kat", "hy": "hye"}
@@ -965,17 +1032,138 @@ def run_tesseract_ocr(file_path, file_type, locale2):
     return "\n".join(texts)
 
 
+def _azure_openai_configured():
+    return bool(AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY)
+
+
+def _img_mime(data: bytes) -> str:
+    """Sniff an image's MIME type from its magic bytes (for the vision data URL)."""
+    if data[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    if data[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    if data[:6] in (b"GIF87a", b"GIF89a"):
+        return "image/gif"
+    return "image/png"
+
+
+def _pdf_to_png_bytes(file_path, max_pages):
+    """Rasterize a PDF to PNG page images via PyMuPDF (no poppler dependency)."""
+    import fitz  # PyMuPDF
+    zoom = 200 / 72  # ~200 DPI is plenty for OCR
+    mat = fitz.Matrix(zoom, zoom)
+    out = []
+    doc = fitz.open(file_path)
+    try:
+        for page in doc[:max_pages]:
+            out.append(page.get_pixmap(matrix=mat).tobytes("png"))
+    finally:
+        doc.close()
+    return out
+
+
+LLM_OCR_PROMPT = (
+    "You are a precise OCR engine. Transcribe ALL text in the image(s) exactly as "
+    "written. Do not translate, summarize, correct, or add any commentary. "
+    "Preserve the natural reading order; for multi-column layouts read the left "
+    "column top-to-bottom first, then the next column. Group the transcription "
+    "into segments by language. Return ONLY valid JSON of the form "
+    '{"segments":[{"lang":"<ISO 639-1 code>","text":"<verbatim text>"}]}. '
+    "Start a new segment every time the language changes."
+)
+
+
+def _parse_llm_segments(raw):
+    """Parse the model's JSON reply into [(locale2, text)]; tolerant of code fences
+    and surrounding prose. Returns [] if nothing parseable is found."""
+    import json
+    s = (raw or "").strip()
+    i, j = s.find("{"), s.rfind("}")
+    if i == -1 or j == -1 or j < i:
+        return []
+    try:
+        data = json.loads(s[i:j + 1])
+    except Exception:
+        return []
+    segs = []
+    for item in (data.get("segments") or []):
+        loc = str(item.get("lang", "")).strip().lower()[:2]
+        txt = item.get("text", "")
+        if loc and isinstance(txt, str) and txt.strip():
+            segs.append((loc, txt))
+    return segs
+
+
 def run_llm_ocr(file_path, file_type, locale2):
-    # Next prototype step: Azure OpenAI gpt-4o vision.
-    logger.warning("OCR_FALLBACK=llm but LLM OCR is not configured yet.")
-    return ""
+    """OCR via Azure OpenAI vision (gpt-4.1-mini): reads scripts Azure Read can't
+    (Georgian, Armenian, ...) and returns language-tagged segments so a mixed page
+    is read with the right voice per language. Returns (text, raw_segments), or
+    ('', None) when Azure OpenAI isn't configured or the call fails."""
+    if not _azure_openai_configured():
+        logger.warning("OCR_FALLBACK=llm but Azure OpenAI is not configured "
+                       "(set AZURE_OPENAI_ENDPOINT / AZURE_OPENAI_API_KEY).")
+        return "", None
+    try:
+        import base64
+        from openai import AzureOpenAI
+        if file_type == "pdf":
+            images = [(png, "image/png") for png in
+                      _pdf_to_png_bytes(file_path, LLM_OCR_MAX_PDF_PAGES)]
+        else:
+            with open(file_path, "rb") as f:
+                data = f.read()
+            images = [(data, _img_mime(data))]
+        content = [{"type": "text", "text": LLM_OCR_PROMPT}]
+        for img, mime in images:
+            b64 = base64.b64encode(img).decode("ascii")
+            content.append({"type": "image_url",
+                            "image_url": {"url": f"data:{mime};base64,{b64}"}})
+        client = AzureOpenAI(azure_endpoint=AZURE_OPENAI_ENDPOINT,
+                             api_key=AZURE_OPENAI_API_KEY,
+                             api_version=AZURE_OPENAI_API_VERSION)
+        resp = client.chat.completions.create(
+            model=AZURE_OPENAI_DEPLOYMENT,
+            messages=[{"role": "user", "content": content}],
+            temperature=0,
+            max_tokens=8000,
+            response_format={"type": "json_object"},
+        )
+        segs = _parse_llm_segments(resp.choices[0].message.content or "")
+        return "\n\n".join(t for _, t in segs), segs
+    except Exception as ex:
+        logger.error(f"LLM OCR failed: {ex!r}")
+        return "", None
+
+
+def _segments_from_raw(raw_segments, fallback_lang):
+    """Normalize LLM raw segments into (dominant_locale2, segments_or_None).
+
+    Drops empty/voiceless spans, normalizes each like the Azure path, picks the
+    language with the most text as dominant, and returns None for `segments` when
+    only one language remains (so the single-voice path is used)."""
+    norm = []
+    for loc, txt in (raw_segments or []):
+        t = normalize_ocr_text(txt or "")
+        if t.strip() and loc in VOICE_MAP:
+            norm.append((loc, t))
+    if not norm:
+        return fallback_lang, None
+    totals = defaultdict(int)
+    for loc, t in norm:
+        totals[loc] += len(t)
+    dominant = max(totals, key=totals.get)
+    segments = norm if len(totals) > 1 else None
+    return dominant, segments
 
 
 def run_fallback_ocr(file_path, file_type, locale2):
-    """Run the configured fallback OCR engine for an Azure-unsupported language."""
-    if OCR_FALLBACK == "llm":
+    """Run the configured fallback OCR engine for an Azure-unsupported language.
+    Returns (text, raw_segments) — raw_segments is None for the Tesseract engine."""
+    if OCR_FALLBACK == "llm" and _azure_openai_configured():
         return run_llm_ocr(file_path, file_type, locale2)
-    return run_tesseract_ocr(file_path, file_type, locale2)
+    return run_tesseract_ocr(file_path, file_type, locale2), None
 
 SUPPORTED_MIME = {
     "image/jpeg", "image/png", "image/tiff", "image/bmp",
@@ -1311,6 +1499,9 @@ class OcrResult(NamedTuple):
     coverage: float             # fraction of text in the dominant language
     script_lang: Optional[str]  # language inferred from a distinct script, if any
     used_fallback: bool         # True when the Tesseract/LLM fallback engine ran
+    # Ordered (locale2, text) spans for a multilingual page, else None. When set,
+    # synthesis reads each span with its own voice instead of one voice for all.
+    segments: Optional[list] = None
 
 
 def extract_text(file_path: str, file_type: str, pinned_lang: str = None) -> OcrResult:
@@ -1322,8 +1513,12 @@ def extract_text(file_path: str, file_type: str, pinned_lang: str = None) -> Ocr
     inferred by script first, then by Azure's per-line detection.
     """
     if pinned_lang in FALLBACK_LANGS:
-        raw = run_fallback_ocr(file_path, file_type, pinned_lang)
-        return OcrResult(normalize_ocr_text(raw or ""), None, None, 0.0, 0.0, None, True)
+        raw, raw_segments = run_fallback_ocr(file_path, file_type, pinned_lang)
+        text = normalize_ocr_text(raw or "")
+        if not text.strip():
+            return OcrResult("", None, None, 0.0, 0.0, None, True)
+        dominant, segments = _segments_from_raw(raw_segments, pinned_lang)
+        return OcrResult(text, None, dominant, 1.0, 1.0, None, True, segments)
 
     # A pinned language on the allowlist is passed to Azure Read as a locale hint,
     # which helps recognition on hard/degraded images. Omitted in the auto-detect
@@ -1341,17 +1536,51 @@ def extract_text(file_path: str, file_type: str, pinned_lang: str = None) -> Ocr
         for line in page.lines:
             extracted_text += line.content + "\n"
     normalized_text = normalize_ocr_text(extracted_text)
-    if not normalized_text.strip():
-        return OcrResult("", ocr_pages, None, 0.0, 0.0, None, False)
+    locale2 = None
+    if normalized_text.strip():
+        script_lang = detect_script_language(normalized_text)
+        if script_lang and script_lang in VOICE_MAP:
+            # A distinct script is authoritative — Azure's per-line guess is
+            # unreliable for these (e.g. Georgian was detected as Thai).
+            locale2, conf, coverage = script_lang, 1.0, 1.0
+        else:
+            locale2, conf, coverage = detect_dominant_language(result)
 
-    script_lang = detect_script_language(normalized_text)
-    if script_lang and script_lang in VOICE_MAP:
-        # A distinct script is authoritative — Azure's per-line guess is
-        # unreliable for these (e.g. Georgian was detected as Thai).
-        locale2, conf, coverage = script_lang, 1.0, 1.0
-    else:
-        locale2, conf, coverage = detect_dominant_language(result)
-    return OcrResult(normalized_text, ocr_pages, locale2, conf, coverage, script_lang, False)
+    if not normalized_text.strip() or locale2 not in VOICE_MAP:
+        # Azure Read found nothing, or what it found isn't one of our supported
+        # languages — for scripts it can't read at all (Georgian/Armenian/...) it
+        # doesn't always come back empty, it can mis-recognize the glyphs as
+        # garbage text in some other script (e.g. confidently "Javanese"). Either
+        # way, give the LLM engine a shot before sending the user to the manual
+        # picker. No-op cost when LLM isn't configured.
+        if OCR_FALLBACK == "llm" and _azure_openai_configured():
+            raw, raw_segments = run_llm_ocr(file_path, file_type, pinned_lang)
+            text = normalize_ocr_text(raw or "")
+            if text.strip():
+                dominant, segments = _segments_from_raw(raw_segments, pinned_lang or "en")
+                return OcrResult(text, ocr_pages, dominant, 1.0, 1.0, None, True, segments)
+        if not normalized_text.strip():
+            return OcrResult("", ocr_pages, None, 0.0, 0.0, None, False)
+
+    segments = build_language_segments(result, locale2) if locale2 else None
+    return OcrResult(normalized_text, ocr_pages, locale2, conf, coverage,
+                     script_lang, False, segments)
+
+
+async def _safe_edit_text(message, text, **kwargs):
+    """Edit a status message without letting a Telegram edit failure abort the
+    flow. A cold-start update redelivery can leave a just-sent status message
+    momentarily non-editable ("Message can't be edited") — but a failed cosmetic
+    status update must never stop us from delivering the OCR audio. Falls back to
+    a fresh message so any attached keyboard/menu still reaches the user."""
+    try:
+        await message.edit_text(text, **kwargs)
+    except Exception as ex:
+        logger.warning(f"status edit_text failed, sending fresh message: {ex!r}")
+        try:
+            await message.chat.send_message(text, **kwargs)
+        except Exception as ex2:
+            logger.warning(f"status fallback send_message failed: {ex2!r}")
 
 
 async def _process_file_payload(
@@ -1386,7 +1615,7 @@ async def _process_file_payload(
             normalized_text = ocr.text
             ocr_ms = round((time.monotonic() - t0) * 1000)
             if not normalized_text.strip():
-                await status_message.edit_text(t(update, "no_text"))
+                await _safe_edit_text(status_message,t(update, "no_text"))
                 await context.bot.send_message(chat_id, t(update, "help"))
                 log_usage(user_id, status="failure", reason="no_text_fallback",
                           file_type=file_type, file_size_kb=file_size_kb, duration_ms=ocr_ms,
@@ -1397,7 +1626,7 @@ async def _process_file_payload(
                 "file_type": file_type, "file_size_kb": file_size_kb, "cost_credits": cost_credits,
             }
             info = VOICE_MAP[default_lang]
-            await status_message.edit_text(
+            await _safe_edit_text(status_message,
                 t(update, "using_default").format(lang=f'{info["flag"]} {info["name"]}')
             )
             stop_typing.set()
@@ -1412,7 +1641,7 @@ async def _process_file_payload(
 
         if not normalized_text.strip():
             logger.info(f"User {user_id} uploaded a file with no detectable text")
-            await status_message.edit_text(t(update, "no_text"))
+            await _safe_edit_text(status_message,t(update, "no_text"))
             await context.bot.send_message(chat_id, t(update, "help"))
             log_usage(user_id, status="failure", reason="no_text", ocr_pages=ocr_pages,
                       file_type=file_type, file_size_kb=file_size_kb, duration_ms=ocr_ms,
@@ -1424,26 +1653,40 @@ async def _process_file_payload(
         context.user_data["ocr_job"] = {
             "text": normalized_text, "ocr_pages": ocr_pages, "ocr_ms": ocr_ms,
             "file_type": file_type, "file_size_kb": file_size_kb, "cost_credits": cost_credits,
+            "segments": ocr.segments,
         }
 
         if default_lang in VOICE_MAP:
             info = VOICE_MAP[default_lang]
-            await status_message.edit_text(
+            await _safe_edit_text(status_message,
                 t(update, "using_default").format(lang=f'{info["flag"]} {info["name"]}')
             )
             stop_typing.set()
             await synthesize_and_send(update, context, default_lang, status_message=None)
+        elif ocr.segments:
+            # Genuinely multilingual page: read every part with its own voice
+            # instead of forcing one language (or sending the user to the menu).
+            seg_locs = []
+            for loc, _ in ocr.segments:
+                if loc not in seg_locs:
+                    seg_locs.append(loc)
+            label = " + ".join(f'{VOICE_MAP[l]["flag"]} {VOICE_MAP[l]["name"]}'
+                               for l in seg_locs if l in VOICE_MAP)
+            await _safe_edit_text(status_message,t(update, "detected_lang").format(lang=label))
+            stop_typing.set()
+            await synthesize_and_send(update, context, locale2, status_message=None,
+                                      use_segments=True)
         elif (locale2 in VOICE_MAP and conf >= AUTO_DETECT_MIN_CONFIDENCE
                 and coverage >= AUTO_DETECT_MIN_COVERAGE):
             info = VOICE_MAP[locale2]
-            await status_message.edit_text(
+            await _safe_edit_text(status_message,
                 t(update, "detected_lang").format(lang=f'{info["flag"]} {info["name"]}')
             )
             stop_typing.set()
             await synthesize_and_send(update, context, locale2, status_message=None)
         else:
             recent = [c for c in prefs.get("recent", "").split(",") if c]
-            await status_message.edit_text(
+            await _safe_edit_text(status_message,
                 t(update, "choose_language"),
                 reply_markup=build_language_keyboard(update, locale2, recent)
             )
@@ -1451,7 +1694,7 @@ async def _process_file_payload(
         logger.error(f"OCR/handle exception for user {user_id}: {e!r}")
         logger.error(traceback.format_exc())
         try:
-            await status_message.edit_text(t(update, "generic_error"))
+            await _safe_edit_text(status_message,t(update, "generic_error"))
         except Exception:
             await context.bot.send_message(chat_id, t(update, "generic_error"))
         await context.bot.send_message(chat_id, t(update, "help"))
@@ -1618,18 +1861,30 @@ def _spell_large_numbers(text: str, lang: str) -> str:
     return text
 
 
-def synthesize_to_file(text: str, locale2: str, out_path: str):
+def _voice_ssml_block(seg_text: str, seg_locale: str) -> str:
+    """One <voice> element for a span, with language-specific text cleanup."""
+    info = VOICE_MAP.get(seg_locale) or VOICE_MAP["en"]
+    body = escape_ssml(prepare_tts_text(seg_text, seg_locale))
+    return f'  <voice name="{info["voice"]}">\n    {body}\n  </voice>'
+
+
+def synthesize_to_file(text: str, locale2: str, out_path: str, segments=None):
     """Synthesize `text` to an MP3 at out_path using the voice for locale2
     (English fallback). Returns the Azure SpeechSynthesisResult so callers can
     inspect result.reason / cancellation_details. No Telegram coupling, so it's
-    reusable by the qa toolkit."""
-    info = VOICE_MAP.get(locale2) or VOICE_MAP["en"]
-    body = escape_ssml(prepare_tts_text(text, locale2))
+    reusable by the qa toolkit.
+
+    `segments` (list of (locale2, text)) renders a multilingual page with one
+    voice per span; when None, the whole text is read with the locale2 voice."""
+    dom = VOICE_MAP.get(locale2) or VOICE_MAP["en"]
+    if segments and len(segments) > 1:
+        voices = "\n".join(_voice_ssml_block(seg_text, seg_loc)
+                           for seg_loc, seg_text in segments)
+    else:
+        voices = _voice_ssml_block(text, locale2)
     ssml = f"""
-<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="{info['lang_code']}">
-  <voice name="{info['voice']}">
-    {body}
-  </voice>
+<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="{dom['lang_code']}">
+{voices}
 </speak>
 """
     synthesizer = SpeechSynthesizer(
@@ -1641,9 +1896,13 @@ def synthesize_to_file(text: str, locale2: str, out_path: str):
 
 
 async def synthesize_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE,
-                              locale2: str, status_message=None) -> None:
+                              locale2: str, status_message=None,
+                              use_segments: bool = False) -> None:
     """Synthesize the stored OCR text into a voice message in the chosen language.
-    Shared by the auto-detect path and the manual inline-picker callback."""
+    Shared by the auto-detect path and the manual inline-picker callback.
+
+    use_segments reads a multilingual page with one voice per language span (auto
+    path only); a manually-picked or pinned language always reads in one voice."""
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
     job = context.user_data.get("ocr_job")
@@ -1673,7 +1932,7 @@ async def synthesize_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE
     try:
         if status_message is not None:
             try:
-                await status_message.edit_text(t(update, "generating_audio").format(lang=lang_label))
+                await _safe_edit_text(status_message,t(update, "generating_audio").format(lang=lang_label))
             except Exception:
                 status_message = None
         if status_message is None:
@@ -1682,7 +1941,8 @@ async def synthesize_and_send(update: Update, context: ContextTypes.DEFAULT_TYPE
             )
 
         audio_path = f"{tempfile.mktemp()}.mp3"
-        result = synthesize_to_file(normalized_text, locale2, audio_path)
+        segments = job.get("segments") if use_segments else None
+        result = synthesize_to_file(normalized_text, locale2, audio_path, segments=segments)
 
         if result.reason != ResultReason.SynthesizingAudioCompleted:
             error_message = "Speech synthesis failed."
