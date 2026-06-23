@@ -117,6 +117,7 @@ MESSAGES = {
         "default_set": "✅ Default language set: {lang}.",
         "default_auto": "✅ Auto-detect enabled — I'll detect each document's language.",
         "lang_hint": "🌐 By default I detect the document's language automatically. If I get it wrong, or to always use a specific language, tap /language.",
+        "start_free_quota": "🆓 You get {free_total} free pages every day. Check your balance anytime with /limits.",
         "bot_description": "Send a photo or PDF and I'll read the text aloud as a voice message. I detect the language automatically — or set one with /language. Made to help people with low vision.",
         "bot_short_description": "Photo/PDF → voice message. Automatic language detection. Helps people with low vision.",
         "feedback_prompt": "📝 Please type your feedback in the next message — I'll pass it on. (You can also use /feedback your text.)",
@@ -168,6 +169,7 @@ MESSAGES = {
         "default_set": "✅ Язык по умолчанию установлен: {lang}.",
         "default_auto": "✅ Включено авто-определение — буду определять язык каждого документа.",
         "lang_hint": "🌐 По умолчанию я определяю язык документа автоматически. Если язык определён неверно — или чтобы всегда использовать конкретный — нажмите /language.",
+        "start_free_quota": "🆓 Каждый день у тебя есть {free_total} бесплатных страниц. Баланс всегда можно посмотреть через /limits.",
         "bot_description": "Пришлите фото или PDF, и я прочитаю текст вслух голосовым сообщением. Язык определяю автоматически — или задайте его через /language. Создан, чтобы помогать людям со слабым зрением.",
         "bot_short_description": "Фото/PDF → голосовое сообщение. Автоопределение языка. Помогает людям со слабым зрением.",
         "feedback_prompt": "📝 Напишите ваш отзыв следующим сообщением — я его передам. (Можно и так: /feedback ваш текст.)",
@@ -219,6 +221,7 @@ MESSAGES = {
         "default_set": "✅ Мову за замовчуванням встановлено: {lang}.",
         "default_auto": "✅ Увімкнено авто-визначення — визначатиму мову кожного документа.",
         "lang_hint": "🌐 За замовчуванням я визначаю мову документа автоматично. Якщо мову визначено неправильно — або щоб завжди використовувати певну — натисніть /language.",
+        "start_free_quota": "🆓 Щодня в тебе є {free_total} безкоштовних сторінок. Баланс завжди можна переглянути через /limits.",
         "bot_description": "Надішліть фото або PDF, і я прочитаю текст уголос голосовим повідомленням. Мову визначаю автоматично — або задайте її через /language. Створений, щоб допомагати людям зі слабким зором.",
         "bot_short_description": "Фото/PDF → голосове повідомлення. Автовизначення мови. Допомагає людям зі слабким зором.",
         "feedback_prompt": "📝 Напишіть ваш відгук наступним повідомленням — я його передам. (Можна й так: /feedback ваш текст.)",
@@ -261,6 +264,7 @@ MESSAGES = {
         "default_set": "✅ Idioma predeterminado establecido: {lang}.",
         "default_auto": "✅ Detección automática activada: detectaré el idioma de cada documento.",
         "lang_hint": "🌐 Por defecto detecto el idioma del documento automáticamente. Si me equivoco, o para usar siempre un idioma concreto, toca /language.",
+        "start_free_quota": "🆓 Tienes {free_total} páginas gratis cada día. Consulta tu saldo cuando quieras con /limits.",
         "bot_description": "Envía una foto o PDF y leeré el texto en voz alta como mensaje de voz. Detecto el idioma automáticamente — o configúralo con /language. Creado para ayudar a personas con baja visión.",
         "bot_short_description": "Foto/PDF → mensaje de voz. Detección automática de idioma. Ayuda a personas con baja visión.",
         "feedback_prompt": "📝 Escribe tu comentario en el siguiente mensaje — lo transmitiré. (También puedes usar /feedback tu texto.)",
@@ -303,6 +307,7 @@ MESSAGES = {
         "default_set": "✅ Standardsprache festgelegt: {lang}.",
         "default_auto": "✅ Automatische Erkennung aktiviert – ich erkenne die Sprache jedes Dokuments.",
         "lang_hint": "🌐 Standardmäßig erkenne ich die Sprache des Dokuments automatisch. Wenn ich falsch liege, oder für eine feste Sprache, tippe auf /language.",
+        "start_free_quota": "🆓 Du hast jeden Tag {free_total} kostenlose Seiten. Deinen Stand siehst du jederzeit mit /limits.",
         "bot_description": "Sende ein Foto oder PDF und ich lese den Text als Sprachnachricht vor. Die Sprache erkenne ich automatisch — oder lege sie mit /language fest. Für Menschen mit Sehbehinderung.",
         "bot_short_description": "Foto/PDF → Sprachnachricht. Automatische Spracherkennung. Für Menschen mit Sehbehinderung.",
         "feedback_prompt": "📝 Schreib dein Feedback in die nächste Nachricht — ich leite es weiter. (Oder nutze /feedback dein Text.)",
@@ -345,6 +350,7 @@ MESSAGES = {
         "default_set": "✅ Langue par défaut définie : {lang}.",
         "default_auto": "✅ Détection automatique activée — je détecterai la langue de chaque document.",
         "lang_hint": "🌐 Par défaut, je détecte automatiquement la langue du document. Si je me trompe, ou pour toujours utiliser une langue précise, tape sur /language.",
+        "start_free_quota": "🆓 Tu as {free_total} pages gratuites chaque jour. Vérifie ton solde à tout moment avec /limits.",
         "bot_description": "Envoie une photo ou un PDF et je lis le texte à voix haute en message vocal. Je détecte la langue automatiquement — ou définis-la avec /language. Conçu pour aider les personnes malvoyantes.",
         "bot_short_description": "Photo/PDF → message vocal. Détection automatique de la langue. Aide les personnes malvoyantes.",
         "feedback_prompt": "📝 Écris ton retour dans le prochain message — je le transmettrai. (Tu peux aussi utiliser /feedback ton texte.)",
@@ -387,6 +393,7 @@ MESSAGES = {
         "default_set": "✅ Ustawiono domyślny język: {lang}.",
         "default_auto": "✅ Włączono automatyczne wykrywanie — wykryję język każdego dokumentu.",
         "lang_hint": "🌐 Domyślnie wykrywam język dokumentu automatycznie. Jeśli się pomylę, lub aby zawsze używać konkretnego języka, naciśnij /language.",
+        "start_free_quota": "🆓 Każdego dnia masz {free_total} darmowych stron. Stan sprawdzisz w każdej chwili przez /limits.",
         "bot_description": "Wyślij zdjęcie lub PDF, a przeczytam tekst na głos jako wiadomość głosową. Język wykrywam automatycznie — lub ustaw go przez /language. Stworzony, by pomagać osobom słabowidzącym.",
         "bot_short_description": "Zdjęcie/PDF → wiadomość głosowa. Automatyczne wykrywanie języka. Pomaga osobom słabowidzącym.",
         "feedback_prompt": "📝 Napisz swoją opinię w następnej wiadomości — przekażę ją. (Możesz też użyć /feedback twój tekst.)",
@@ -429,6 +436,7 @@ MESSAGES = {
         "default_set": "✅ Idioma padrão definido: {lang}.",
         "default_auto": "✅ Detecção automática ativada — vou detectar o idioma de cada documento.",
         "lang_hint": "🌐 Por padrão, detecto o idioma do documento automaticamente. Se eu errar, ou para usar sempre um idioma específico, toque em /language.",
+        "start_free_quota": "🆓 Você tem {free_total} páginas grátis por dia. Veja seu saldo quando quiser com /limits.",
         "bot_description": "Envie uma foto ou PDF e eu leio o texto em voz alta como mensagem de voz. Detecto o idioma automaticamente — ou defina com /language. Feito para ajudar pessoas com baixa visão.",
         "bot_short_description": "Foto/PDF → mensagem de voz. Detecção automática de idioma. Ajuda pessoas com baixa visão.",
         "feedback_prompt": "📝 Escreva seu comentário na próxima mensagem — vou repassá-lo. (Você também pode usar /feedback seu texto.)",
@@ -608,7 +616,7 @@ USER_TABLE_NAME = "users"
 FEEDBACK_TABLE_NAME = "feedback"
 STORE_PARTITION = BOT_ENV or "user"  # isolate dev/prod data within one shared table
 MAX_RECENT_LANGS = 3
-FREE_DAILY_LIMIT = max(1, int(os.environ.get("FREE_DAILY_LIMIT", "5")))
+FREE_DAILY_LIMIT = max(1, int(os.environ.get("FREE_DAILY_LIMIT", "10")))
 # How long a pending /feedback prompt stays "armed" (survives scale-to-zero / replica
 # switch via storage). Beyond this, a stray text message won't be captured as feedback.
 FEEDBACK_WAIT_WINDOW_SEC = 3600
@@ -1250,7 +1258,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.info(f"UserStartedBot: user_id={user_id}, lang={lang_code}, source={start_source or '-'}")
     log_growth_event(user_id, event_type="onboarding_start", source=start_source or None)
     await update.message.reply_text(
-        f"{t(update, 'welcome')}\n\n{t(update, 'mission_intro')}\n\n{t(update, 'lang_hint')}",
+        f"{t(update, 'welcome')}\n\n{t(update, 'mission_intro')}\n\n"
+        f"{t(update, 'start_free_quota', free_total=FREE_DAILY_LIMIT)}\n\n{t(update, 'lang_hint')}",
         reply_markup=build_onboarding_keyboard(update),
     )
 
